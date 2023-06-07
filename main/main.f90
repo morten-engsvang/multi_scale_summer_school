@@ -113,12 +113,9 @@ real(dp), dimension(nz-1) :: K_m_half ! [m/s] K_m parameter for the half-values
 real(dp), dimension(nz) :: K_h ! [m/s] K_h-parameter for the integer values
 real(dp), dimension(nz-1) :: K_h_half ! [m/s] K_h-parameter for the integer values
 
-real(dp), dimension(nz) :: du_dz ! Derivative of u with regards to height, i.e., vertical wind profile.
-real(dp), dimension(nz-1) :: du_dz_half ! Derivative of u with regards to half-values of height, i.e., vertical wind profile.
-
 ! Final vectors to store the changes
-real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp
-real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to temp
+real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp at integer values
+real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to temp at integer values
 real(dp), dimension(nz) :: dtheta_dt ! Derivative of theta with regards to temp
 real(dp), dimension(nz) :: dc_dt ! Derivative of scalar concentration with regards to temp                     
 
@@ -147,14 +144,12 @@ do while (time <= time_end)
 
   ! Update meteorology
 
-  ! Determine the K_values at this time:
-  call K_values(K_m,K_m_half,K_h,K_h_half,uwind,vwind)
-
-  ! First the change of wind speeds, du_dt and dv_dt
-  ! Loop over the second z value to the second last, the excluded values are
-  ! constant and determined by the boundary conditions:
+  ! First the change of wind speeds, du_dt, dv_dt, du_dt_half, dv_dt_half
   call wind_derivatives(uwind,vwind,du_dt,dv_dt)
   
+  ! Determine the K_values at this time with the updated derivatives
+  call K_values(K_m,K_m_half,K_h,K_h_half)
+
   ! Then the update of temperature diffusion
   ! Once again boundary conditions are defined and constant.
   dtheta_dt(1) = 0
@@ -444,13 +439,17 @@ subroutine surface_values(temperature, time)
 end subroutine surface_values
 
 
-subroutine K_values(K_m,K_m_half,K_h,K_h_half,uwind,vwind)
+subroutine K_values(K_m,K_m_half,K_h,K_h_half)
   real(dp), dimension(nz) :: K_m ! [m/s] K_m-parameter for the integer values
   real(dp), dimension(nz-1) :: K_m_half ! [m/s] K_m parameter for the half-values
   real(dp), dimension(nz) :: K_h ! [m/s] K_h-parameter for the integer values
   real(dp), dimension(nz-1) :: K_h_half ! [m/s] K_h-parameter for the integer values
-  real(dp), dimension(nz) :: uwind, &  ! [m s-1], u component of wind
-                             vwind  ! [m s-1], v component of wind
+  real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp at integer values
+  real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to temp at integer values
+  real(dp), dimension(nz) :: dv_bar_dt ! Absolute value of the derivatives of the wind values at different heights
+  real(dp), dimension(nz) :: L ! The L factor at different heights, used in model 2 and 3.
+  real(dp) :: du_dz, dv_dz ! Derivatives of the wind speeds with regards to height
+
 
   select case (model_number)
   case (1)
@@ -459,7 +458,14 @@ subroutine K_values(K_m,K_m_half,K_h,K_h_half,uwind,vwind)
     K_h = 5
     K_h_half = 5
   case (2)
-
+    ! First determine the absolute value of the wind speed vector for the different heights
+    ! and the value of the L factor at different heights.
+    ! First at the integer heights:
+    do i = 1, nz
+      
+      dv_bar_dt(i) = sqrt(du_dt(i)**2 + dv_dt(i)**2)
+      L = vonk * hh(i) / (1 + (vonk * hh(i)) / lambda)
+    end do
   case (3)
 
   end select
@@ -470,8 +476,12 @@ end subroutine K_values
 subroutine wind_derivatives(uwind,vwind,du_dt,dv_dt)
 real(dp), dimension(nz) :: uwind, &  ! [m s-1], u component of wind
                            vwind  ! [m s-1], v component of wind
-real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp
-real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to temp
+real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp at integer values
+real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to temp at integer values
+
+! First I calculate for the integer values:
+! Loop over the second z value to the second last, the excluded values are
+! constant and determined by the boundary conditions:
 du_dt(1) = 0
 du_dt(nz) = 0
 dv_dt(1) = 0
@@ -481,7 +491,6 @@ do i = 2, nz - 1
   du_dt(i) = fcor*(vwind(i)-vg) + &
   (K_m_half(i) * ((uwind(i + 1) - uwind(i)) / (hh(i + 1) - hh(i))) - & 
   K_m_half(i - 1) * ((uwind(i) - uwind(i - 1)) / (hh(i) - hh(i - 1)))) / ((hh(i + 1) - hh(i - 1)) / 2)
-
   ! Then the same for dv_dt
   dv_dt(i) = -fcor*(uwind(i)-ug) + &
   (K_m_half(i) * ((vwind(i + 1) - vwind(i)) / (hh(i + 1) - hh(i))) - & 
@@ -550,5 +559,12 @@ function barometric_law(p00, tempK, h) result(p)
     p(i) = p(i-1)*exp(-mm_air*grav/(Rgas*(tempK(i-1)+tempK(i))/2.0d0)*dh(i))
   end do
 end function barometric_law
+
+function half_z(z1,z2) result(z_half)
+  real(dp) :: z1
+  real(dp) :: z2
+  real(dp) :: z_half
+  z_half = (z1 + z2) / 2
+end function
 
 end program main
