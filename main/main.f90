@@ -105,6 +105,22 @@ real(dp), dimension(nz  ) :: uwind, &  ! [m s-1], u component of wind
 real(dp), dimension(nz  ) :: temp, &   ! [K], air temperature
                              pres      ! [Pa], air pressure
 
+! Defining K-parameters, both integer and half-values. There are only 49 intermediate values
+! For each value K_m(i) the half-value above it is K_m_half(i)
+real(dp), dimension(nz) :: K_m = 5 ! [m/s] K_m-parameter for the integer values
+real(dp), dimension(nz-1) :: K_m_half = 5 ! [m/s] K_m parameter for the half-values
+real(dp), dimension(nz) :: K_h = 5 ! [m/s] K_h-parameter for the integer values
+real(dp), dimension(nz-1) :: K_h_half = 5 ! [m/s] K_h-parameter for the integer values
+
+real(dp), dimension(nz) :: du_dz ! Derivative of u with regards to height, i.e., vertical wind profile.
+real(dp), dimension(nz-1) :: du_dz_half ! Derivative of u with regards to half-values of height, i.e., vertical wind profile.
+
+! Final vectors to store the changes
+real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp
+real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to temp
+real(dp), dimension(nz) :: dtheta_dt ! Derivative of theta with regards to temp
+real(dp), dimension(nz) :: dc_dt ! Derivative of scalar concentration with regards to temp                     
+
 integer :: i, j  ! used for loops
 
 
@@ -131,6 +147,32 @@ do while (time <= time_end)
 
   ! Update meteorology
 
+  ! First the change of wind speeds, du_dt and dv_dt
+  ! Loop over the second z value to the second last, the excluded values are
+  ! constant and determined by the boundary conditions:
+  du_dt(1) = 0
+  du_dt(nz) = 0
+  dv_dt(1) = 0
+  dv_dt(nz) = 0
+  do i = 2, nz-1
+    ! First update du_dt
+    du_dt(i) = fcor*(vwind(i)-vg) + &
+    (K_m_half(i) * ((uwind(i + 1) - uwind(i)) / (hh(i + 1) - hh(i))) - & 
+    K_m_half(i - 1) * ((uwind(i) - uwind(i - 1)) / (hh(i) - hh(i - 1)))) / ((hh(i + 1)-hh(i - 1)) / 2)
+
+    ! Then the same for dv_dt
+    dv_dt(i) = -fcor*(uwind(i)-ug) + &
+    (K_m_half(i) * ((vwind(i + 1) - vwind(i)) / (hh(i + 1) - hh(i))) - & 
+    K_m_half(i - 1) * ((vwind(i) - vwind(i - 1)) / (hh(i) - hh(i - 1)))) / ((hh(i + 1)-hh(i - 1)) / 2)
+  end do
+  
+
+  ! Update the values
+  ! uwind(time+1) = uwind(time)+delta(time)*du_dt
+  do i = 2, nz-1
+    uwind(i) = uwind(i)+dt*du_dt(i)
+    vwind(i) = vwind(i)+dt*dv_dt(i)
+  end do
   !---------------------------------------------------------------------------------------
   ! Emission
   !---------------------------------------------------------------------------------------
