@@ -153,21 +153,7 @@ do while (time <= time_end)
   ! First the change of wind speeds, du_dt and dv_dt
   ! Loop over the second z value to the second last, the excluded values are
   ! constant and determined by the boundary conditions:
-  du_dt(1) = 0
-  du_dt(nz) = 0
-  dv_dt(1) = 0
-  dv_dt(nz) = 0
-  do i = 2, nz - 1
-    ! First update du_dt
-    du_dt(i) = fcor*(vwind(i)-vg) + &
-    (K_m_half(i) * ((uwind(i + 1) - uwind(i)) / (hh(i + 1) - hh(i))) - & 
-    K_m_half(i - 1) * ((uwind(i) - uwind(i - 1)) / (hh(i) - hh(i - 1)))) / ((hh(i + 1) - hh(i - 1)) / 2)
-
-    ! Then the same for dv_dt
-    dv_dt(i) = -fcor*(uwind(i)-ug) + &
-    (K_m_half(i) * ((vwind(i + 1) - vwind(i)) / (hh(i + 1) - hh(i))) - & 
-    K_m_half(i - 1) * ((vwind(i) - vwind(i - 1)) / (hh(i) - hh(i - 1)))) / ((hh(i + 1) - hh(i - 1)) / 2)
-  end do
+  call wind_derivatives(uwind,vwind,du_dt,dv_dt)
   
   ! Then the update of temperature diffusion
   ! Once again boundary conditions are defined and constant.
@@ -479,6 +465,30 @@ subroutine K_values(K_m,K_m_half,K_h,K_h_half,uwind,vwind)
   end select
 
 end subroutine K_values
+
+
+subroutine wind_derivatives(uwind,vwind,du_dt,dv_dt)
+real(dp), dimension(nz) :: uwind, &  ! [m s-1], u component of wind
+                           vwind  ! [m s-1], v component of wind
+real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp
+real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to temp
+du_dt(1) = 0
+du_dt(nz) = 0
+dv_dt(1) = 0
+dv_dt(nz) = 0
+do i = 2, nz - 1
+  ! First update du_dt
+  du_dt(i) = fcor*(vwind(i)-vg) + &
+  (K_m_half(i) * ((uwind(i + 1) - uwind(i)) / (hh(i + 1) - hh(i))) - & 
+  K_m_half(i - 1) * ((uwind(i) - uwind(i - 1)) / (hh(i) - hh(i - 1)))) / ((hh(i + 1) - hh(i - 1)) / 2)
+
+  ! Then the same for dv_dt
+  dv_dt(i) = -fcor*(uwind(i)-ug) + &
+  (K_m_half(i) * ((vwind(i + 1) - vwind(i)) / (hh(i + 1) - hh(i))) - & 
+  K_m_half(i - 1) * ((vwind(i) - vwind(i - 1)) / (hh(i) - hh(i - 1)))) / ((hh(i + 1) - hh(i - 1)) / 2)
+end do
+
+end subroutine wind_derivatives
 !-----------------------------------------------------------------------------------------
 ! Calculate the radiation related quantities
 !-----------------------------------------------------------------------------------------
