@@ -22,6 +22,7 @@ logical :: use_emission   = .true.
 logical :: use_chemistry  = .true.
 logical :: use_deposition = .false.
 logical :: use_aerosol    = .true.
+integer, parameter :: model_number = 1 ! Which K-model to use.
 character(len=255), parameter :: input_dir  = './input'
 character(len=255), parameter :: output_dir = './output'
 
@@ -107,10 +108,10 @@ real(dp), dimension(nz  ) :: temp, &   ! [K], air temperature
 
 ! Defining K-parameters, both integer and half-values. There are only 49 intermediate values
 ! For each value K_m(i) the half-value above it is K_m_half(i)
-real(dp), dimension(nz) :: K_m = 5 ! [m/s] K_m-parameter for the integer values
-real(dp), dimension(nz-1) :: K_m_half = 5 ! [m/s] K_m parameter for the half-values
-real(dp), dimension(nz) :: K_h = 5 ! [m/s] K_h-parameter for the integer values
-real(dp), dimension(nz-1) :: K_h_half = 5 ! [m/s] K_h-parameter for the integer values
+real(dp), dimension(nz) :: K_m ! [m/s] K_m-parameter for the integer values
+real(dp), dimension(nz-1) :: K_m_half ! [m/s] K_m parameter for the half-values
+real(dp), dimension(nz) :: K_h ! [m/s] K_h-parameter for the integer values
+real(dp), dimension(nz-1) :: K_h_half ! [m/s] K_h-parameter for the integer values
 
 real(dp), dimension(nz) :: du_dz ! Derivative of u with regards to height, i.e., vertical wind profile.
 real(dp), dimension(nz-1) :: du_dz_half ! Derivative of u with regards to half-values of height, i.e., vertical wind profile.
@@ -134,7 +135,6 @@ call meteorology_init()          ! initialize meteorology
 call open_files()        ! open output files
 call write_files(time)   ! write initial values
 
-
 !-----------------------------------------------------------------------------------------
 ! Start main loop
 !-----------------------------------------------------------------------------------------
@@ -147,6 +147,9 @@ do while (time <= time_end)
 
   ! Update meteorology
 
+  ! Determine the K_values at this time:
+  call K_values(K_m,K_m_half,K_h,K_h_half,uwind,vwind)
+
   ! First the change of wind speeds, du_dt and dv_dt
   ! Loop over the second z value to the second last, the excluded values are
   ! constant and determined by the boundary conditions:
@@ -154,24 +157,33 @@ do while (time <= time_end)
   du_dt(nz) = 0
   dv_dt(1) = 0
   dv_dt(nz) = 0
-  do i = 2, nz-1
+  do i = 2, nz - 1
     ! First update du_dt
     du_dt(i) = fcor*(vwind(i)-vg) + &
     (K_m_half(i) * ((uwind(i + 1) - uwind(i)) / (hh(i + 1) - hh(i))) - & 
-    K_m_half(i - 1) * ((uwind(i) - uwind(i - 1)) / (hh(i) - hh(i - 1)))) / ((hh(i + 1)-hh(i - 1)) / 2)
+    K_m_half(i - 1) * ((uwind(i) - uwind(i - 1)) / (hh(i) - hh(i - 1)))) / ((hh(i + 1) - hh(i - 1)) / 2)
 
     ! Then the same for dv_dt
     dv_dt(i) = -fcor*(uwind(i)-ug) + &
     (K_m_half(i) * ((vwind(i + 1) - vwind(i)) / (hh(i + 1) - hh(i))) - & 
-    K_m_half(i - 1) * ((vwind(i) - vwind(i - 1)) / (hh(i) - hh(i - 1)))) / ((hh(i + 1)-hh(i - 1)) / 2)
+    K_m_half(i - 1) * ((vwind(i) - vwind(i - 1)) / (hh(i) - hh(i - 1)))) / ((hh(i + 1) - hh(i - 1)) / 2)
   end do
   
+  ! Then the update of temperature diffusion
+  ! Once again boundary conditions are defined and constant.
+  dtheta_dt(1) = 0
+  dtheta_dt(nz) = 0
+  do i = 2, nz - 1
+    dtheta_dt(i) = (K_h_half(i) * ((theta(i + 1) - theta(i)) / (hh(i + 1) - hh(i))) - & 
+    K_h_half(i - 1) * ((theta(i) - theta(i - 1)) / (hh(i) - hh(i - 1)))) / ((hh(i + 1) - hh(i)) / 2)
+  end do
 
   ! Update the values
   ! uwind(time+1) = uwind(time)+delta(time)*du_dt
   do i = 2, nz-1
     uwind(i) = uwind(i)+dt*du_dt(i)
     vwind(i) = vwind(i)+dt*dv_dt(i)
+    theta(i) = theta(i)+dt*dtheta_dt(i)
   end do
   !---------------------------------------------------------------------------------------
   ! Emission
@@ -446,6 +458,27 @@ subroutine surface_values(temperature, time)
 end subroutine surface_values
 
 
+subroutine K_values(K_m,K_m_half,K_h,K_h_half,uwind,vwind)
+  real(dp), dimension(nz) :: K_m ! [m/s] K_m-parameter for the integer values
+  real(dp), dimension(nz-1) :: K_m_half ! [m/s] K_m parameter for the half-values
+  real(dp), dimension(nz) :: K_h ! [m/s] K_h-parameter for the integer values
+  real(dp), dimension(nz-1) :: K_h_half ! [m/s] K_h-parameter for the integer values
+  real(dp), dimension(nz) :: uwind, &  ! [m s-1], u component of wind
+                             vwind  ! [m s-1], v component of wind
+
+  select case (model_number)
+  case (1)
+    K_m = 5
+    K_m_half = 5
+    K_h = 5
+    K_h_half = 5
+  case (2)
+
+  case (3)
+
+  end select
+
+end subroutine K_values
 !-----------------------------------------------------------------------------------------
 ! Calculate the radiation related quantities
 !-----------------------------------------------------------------------------------------
