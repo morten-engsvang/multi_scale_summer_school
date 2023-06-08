@@ -467,33 +467,41 @@ subroutine K_values(K_m,K_m_half,K_h,K_h_half,richard)
 
   select case (model_number)
   case (1)
+    ! Model 1 assumes that the K values are constant at 5 m/s
     K_m = 5.0_dp
     K_m_half = 5.0_dp
     K_h = 5.0_dp
     K_h_half = 5.0_dp
   case (2)
-    ! First determine the absolute value of the wind speed vector for the different heights
-    ! and the value of the L factor at different heights.
+    ! First determine the absolute value of the wind speed vector for the different half-heights
+    ! and the value of the L factor at the half-heights
     ! I calculate only the K values for the half_values
     do i = 1, nz-1
       du_dz = (uwind(i + 1) - uwind(i)) / (hh(i + 1) - hh(i))
       dv_dz = (vwind(i + 1) - vwind(i)) / (hh(i + 1) - hh(i))
       dv_bar_dt = sqrt(du_dz**2 + dv_dz**2)
+      ! Quickly get the heigth at the half-height:
       half_height = half_z(hh(i), hh(i + 1))
       L = vonk * half_height / (1 + (vonk * half_height / lambda))
       K_m_half(i) = L**2 * dv_bar_dt
+      ! They are defined to be identical for identical heights:
       K_h_half(i) = K_m_half(i)
     end do
   case (3)
     do i = 1, nz-1
+      ! First find the derivatives of the parameters with respect to height:
       du_dz = (uwind(i + 1) - uwind(i)) / (hh(i + 1) - hh(i))
       dv_dz = (vwind(i + 1) - vwind(i)) / (hh(i + 1) - hh(i))
       dtheta_dz = (theta(i + 1) - theta(i)) / (hh(i + 1) - hh(i))
       dv_bar_dt = sqrt(du_dz**2 + dv_dz**2)
+      ! Find the height at the half-height:
       half_height = half_z(hh(i), hh(i + 1))
       L = vonk * half_height / (1 + (vonk * half_height / lambda))
+      ! Find potential temperature at the half-height by extrapolation:
       theta_extrapolated = (theta(i + 1) + theta(i)) / 2
+      ! Calculate Richards Numbers
       richard(i) = (grav / theta_extrapolated) * (dtheta_dz / (du_dz**2 + dv_dz**2))
+      ! Determine the case based on the magnitude and sign and calculate the correction factor:
       if (richard(i) < 0.0) then
         f_m = sqrt(1 - 16 * richard(i))
         f_h = (1 - 16 * richard(i))**(3.0/4.0)
