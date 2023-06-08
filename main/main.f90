@@ -108,11 +108,11 @@ real(dp), dimension(nz  ) :: temp, &   ! [K], air temperature
 
 ! Defining K-parameters, both integer and half-values. There are only 49 intermediate values
 ! For each value K_m(i) the half-value above it is K_m_half(i)
-real(dp), dimension(nz) :: K_m ! [m/s] K_m-parameter for the integer values
-real(dp), dimension(nz-1) :: K_m_half ! [m/s] K_m parameter for the half-values
-real(dp), dimension(nz) :: K_h ! [m/s] K_h-parameter for the integer values
-real(dp), dimension(nz-1) :: K_h_half ! [m/s] K_h-parameter for the integer values
-real(dp), dimension(nz-1) :: richard ! Richardson number for thermal stability, I only define this for half-integer values of height.
+real(dp), dimension(nz) :: K_m = 0.0_dp ! [m/s] K_m-parameter for the integer values
+real(dp), dimension(nz-1) :: K_m_half = 0.0_dp ! [m/s] K_m parameter for the half-values
+real(dp), dimension(nz) :: K_h = 0.0_dp ! [m/s] K_h-parameter for the integer values
+real(dp), dimension(nz-1) :: K_h_half = 0.0_dp ! [m/s] K_h-parameter for the integer values
+real(dp), dimension(nz-1) :: richard = 0.0_dp ! Richardson number for thermal stability, I only define this for half-integer values of height.
 
 ! Final vectors to store the changes
 real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp at integer values
@@ -290,6 +290,10 @@ subroutine open_files()
   open(10,file=trim(adjustl(output_dir))//'/uwind.dat',status='replace',action='write')
   open(11,file=trim(adjustl(output_dir))//'/vwind.dat',status='replace',action='write')
   open(12,file=trim(adjustl(output_dir))//'/theta.dat',status='replace',action='write')
+  
+  open(13,file=trim(adjustl(output_dir))//'/K_m.dat',status='replace',action='write')
+  open(14,file=trim(adjustl(output_dir))//'/K_h.dat',status='replace',action='write')
+  open(15,file=trim(adjustl(output_dir))//'/richard.dat',status='replace',action='write')
 end subroutine open_files
 
 
@@ -318,6 +322,10 @@ subroutine write_files(time)
   write(10, outfmt_level     ) uwind
   write(11, outfmt_level     ) vwind
   write(12, outfmt_level     ) theta
+
+  write(13, outfmt_mid_level     ) K_m_half
+  write(14, outfmt_mid_level     ) K_h_half
+  write(16, outfmt_mid_level     ) richard
 end subroutine write_files
 
 
@@ -332,6 +340,9 @@ subroutine close_files()
   close(10)
   close(11)
   close(12)
+  close(13)
+  close(14)
+  close(15)
 end subroutine close_files
 
 
