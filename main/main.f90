@@ -117,7 +117,7 @@ real(dp), dimension(nz-1) :: K_h_half ! [m/s] K_h-parameter for the integer valu
 real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp at integer values
 real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to temp at integer values
 real(dp), dimension(nz) :: dtheta_dt ! Derivative of theta with regards to temp
-real(dp), dimension(nz) :: dc_dt ! Derivative of scalar concentration with regards to temp                     
+! real(dp), dimension(nz) :: dc_dt ! Derivative of scalar concentration with regards to temp                     
 
 integer :: i, j  ! used for loops
 
@@ -152,8 +152,8 @@ do while (time <= time_end)
 
   ! Then the update of temperature diffusion
   ! Once again boundary conditions are defined and constant.
-  dtheta_dt(1) = 0
-  dtheta_dt(nz) = 0
+  dtheta_dt(1) = 0.0_dp
+  dtheta_dt(nz) = 0.0_dp
   do i = 2, nz - 1
     dtheta_dt(i) = (K_h_half(i) * ((theta(i + 1) - theta(i)) / (hh(i + 1) - hh(i))) - & 
     K_h_half(i - 1) * ((theta(i) - theta(i - 1)) / (hh(i) - hh(i - 1)))) / ((hh(i + 1) - hh(i)) / 2)
@@ -444,27 +444,28 @@ subroutine K_values(K_m,K_m_half,K_h,K_h_half)
   real(dp), dimension(nz-1) :: K_m_half ! [m/s] K_m parameter for the half-values
   real(dp), dimension(nz) :: K_h ! [m/s] K_h-parameter for the integer values
   real(dp), dimension(nz-1) :: K_h_half ! [m/s] K_h-parameter for the integer values
-  real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp at integer values
-  real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to temp at integer values
-  real(dp), dimension(nz) :: dv_bar_dt ! Absolute value of the derivatives of the wind values at different heights
-  real(dp), dimension(nz) :: L ! The L factor at different heights, used in model 2 and 3.
+  real(dp) :: dv_bar_dt ! Absolute value of the derivatives of the wind values at a given height
+  real(dp) :: L ! The L factor at a given height, used in model 2 and 3.
   real(dp) :: du_dz, dv_dz ! Derivatives of the wind speeds with regards to height
 
 
   select case (model_number)
   case (1)
-    K_m = 5
-    K_m_half = 5
-    K_h = 5
-    K_h_half = 5
+    K_m = 5.0_dp
+    K_m_half = 5.0_dp
+    K_h = 5.0_dp
+    K_h_half = 5.0_dp
   case (2)
     ! First determine the absolute value of the wind speed vector for the different heights
     ! and the value of the L factor at different heights.
-    ! First at the integer heights:
-    do i = 1, nz
-      
-      dv_bar_dt(i) = sqrt(du_dt(i)**2 + dv_dt(i)**2)
+    ! I calculate only the K values for the half_values
+    do i = 1, nz-1
+      du_dz = (uwind(i + 1) - uwind(i)) / (hh(i + 1) - hh(i))
+      dv_dz = (vwind(i + 1) - vwind(i)) / (hh(i + 1) - hh(i))
+      dv_bar_dt = sqrt(du_dz**2 + dv_dz**2)
       L = vonk * hh(i) / (1 + (vonk * hh(i)) / lambda)
+      K_m_half(i) = L**2 * dv_bar_dt
+      K_h_half(i) = L**2 * dv_bar_dt
     end do
   case (3)
 
