@@ -463,6 +463,7 @@ subroutine K_values(K_m,K_m_half,K_h,K_h_half,richard)
   real(dp), dimension(nz-1) :: richard ! Richardsons number for thermal stability.
   real(dp) :: f_m ! Function value of Richardsons number for wind
   real(dp) :: f_h ! Function value of Richardsons number for diffusion
+  real(dp) :: theta_extrapolated ! Extrapolated temperature between two integer levels
 
   select case (model_number)
   case (1)
@@ -491,7 +492,8 @@ subroutine K_values(K_m,K_m_half,K_h,K_h_half,richard)
       dv_bar_dt = sqrt(du_dz**2 + dv_dz**2)
       half_height = half_z(hh(i), hh(i + 1))
       L = vonk * half_height / (1 + (vonk * half_height / lambda))
-      richard(i) = (grav / theta(i)) * dtheta_dz / (du_dz**2 + dv_dz**2)
+      theta_extrapolated = (theta(i + 1) + theta(i)) / 2
+      richard(i) = (grav / theta_extrapolated) * (dtheta_dz / (du_dz**2 + dv_dz**2))
       if (richard(i) < 0.0) then
         f_m = sqrt(1 - 16 * richard(i))
         f_h = (1 - 16 * richard(i))**(3.0/4.0)
@@ -503,9 +505,6 @@ subroutine K_values(K_m,K_m_half,K_h,K_h_half,richard)
         f_h = f_m
       end if
       K_m_half(i) = L**2 * dv_bar_dt * f_m
-      !if (i == 10) then
-      !  write(*,*) K_m_half(10), f_m, richard
-      !end if
       K_h_half(i) = L**2 * dv_bar_dt * f_h
     end do
   end select

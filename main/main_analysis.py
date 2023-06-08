@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import matplotlib.pyplot as plt
+import matplotlib.colors as plc
 from matplotlib.animation import FuncAnimation
 import tools
 import numpy as np
@@ -39,15 +40,53 @@ def Plot(hh,data,xlabel,ylabel,day):
     
     plt.legend()
     #plt.savefig("three_body.pdf", format="pdf", bbox_inches="tight")
+
+def PlotHeatMap(hh,time,data,xlabel,ylabel):
+    fig, axis = plt.subplots()
+    axis.set_xlabel(xlabel)
+    axis.set_ylabel(ylabel)
+    height = np.zeros(len(hh[0])-1)
+    i = 0
+    for element in height:
+        half_height = (hh[0,i+1] + hh[0,i]) / 2
+        #print(half_height)
+        height[i] = half_height
+        i += 1
+    plt.pcolormesh(time[:,0],height,np.transpose(data),vmax=175,vmin=-1)
+    plt.colorbar()
+    
+def PlotHeatMapNorm(hh,time,data,xlabel,ylabel):
+    fig, axis = plt.subplots()
+    axis.set_xlabel(xlabel)
+    axis.set_ylabel(ylabel)
+    height = np.zeros(len(hh[0])-1)
+    i = 0
+    for element in height:
+        half_height = (hh[0,i+1] + hh[0,i]) / 2
+        #print(half_height)
+        height[i] = half_height
+        i += 1
+    
+    plt.pcolormesh(time[:,0],height,np.transpose(data),norm=plc.PowerNorm(vmin=-1,vmax=300,gamma=0.5))
+    plt.colorbar(ticks=[-1,0,5,50,100,200,300])
+    
     
     
 hh = tools.ReadGeneralData("output/hh.dat")
 uwind = tools.ReadGeneralData("output/uwind.dat")
 vwind = tools.ReadGeneralData("output/vwind.dat")
 theta = tools.ReadGeneralData("output/theta.dat")
+K_m = tools.ReadGeneralData("output/K_m.dat")
+K_h = tools.ReadGeneralData("output/K_h.dat")
+richard = tools.ReadGeneralData("output/richard.dat")
+time = tools.ReadGeneralData("output/time.dat")
 Plot(hh,uwind,"Wind speed [m/s]","Height [m]",1)
 Plot(hh,uwind,"Wind speed [m/s]","Height [m]",5)
 Plot(hh,vwind,"Wind speed [m/s]","Height [m]",1)
 Plot(hh,vwind,"Wind speed [m/s]","Height [m]",5)
 Plot(hh,theta,"Potential Temperature [K]","Height [m]",1)
 Plot(hh,theta,"Potential Temperature [K]","Height [m]",5)
+PlotHeatMap(hh,time,K_m,"Time [days]","Height [m]")
+PlotHeatMap(hh,time,K_h,"Time [days]","Height [m]")
+PlotHeatMap(hh,time,richard,"Time [days]","Height [m]")
+PlotHeatMapNorm(hh,time,richard,"Time [days]","Height [m]")
