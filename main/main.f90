@@ -325,7 +325,7 @@ subroutine write_files(time)
 
   write(13, outfmt_mid_level     ) K_m_half
   write(14, outfmt_mid_level     ) K_h_half
-  write(16, outfmt_mid_level     ) richard
+  write(15, outfmt_mid_level     ) richard
 end subroutine write_files
 
 
