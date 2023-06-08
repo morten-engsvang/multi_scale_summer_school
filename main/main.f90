@@ -22,7 +22,7 @@ logical :: use_emission   = .true.
 logical :: use_chemistry  = .true.
 logical :: use_deposition = .false.
 logical :: use_aerosol    = .true.
-integer, parameter :: model_number = 1 ! Which K-model to use.
+integer, parameter :: model_number = 3 ! Which K-model to use.
 character(len=255), parameter :: input_dir  = './input'
 character(len=255), parameter :: output_dir = './output'
 
@@ -112,6 +112,7 @@ real(dp), dimension(nz) :: K_m ! [m/s] K_m-parameter for the integer values
 real(dp), dimension(nz-1) :: K_m_half ! [m/s] K_m parameter for the half-values
 real(dp), dimension(nz) :: K_h ! [m/s] K_h-parameter for the integer values
 real(dp), dimension(nz-1) :: K_h_half ! [m/s] K_h-parameter for the integer values
+real(dp), dimension(nz-1) :: richard ! Richardson number for thermal stability, I only define this for half-integer values of height.
 
 ! Final vectors to store the changes
 real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp at integer values
@@ -145,7 +146,7 @@ do while (time <= time_end)
   ! Update meteorology
 
   ! Determine the K_values at this time
-  call K_values(K_m,K_m_half,K_h,K_h_half)
+  call K_values(K_m,K_m_half,K_h,K_h_half,richard)
   ! First the change of wind speeds, du_dt, dv_dt, du_dt_half, dv_dt_half
   call wind_derivatives(uwind,vwind,du_dt,dv_dt)
 
@@ -438,7 +439,7 @@ subroutine surface_values(temperature, time)
 end subroutine surface_values
 
 
-subroutine K_values(K_m,K_m_half,K_h,K_h_half)
+subroutine K_values(K_m,K_m_half,K_h,K_h_half,richard)
   real(dp), dimension(nz) :: K_m ! [m/s] K_m-parameter for the integer values
   real(dp), dimension(nz-1) :: K_m_half ! [m/s] K_m parameter for the half-values
   real(dp), dimension(nz) :: K_h ! [m/s] K_h-parameter for the integer values
@@ -446,8 +447,11 @@ subroutine K_values(K_m,K_m_half,K_h,K_h_half)
   real(dp) :: dv_bar_dt ! Absolute value of the derivatives of the wind values at a given height
   real(dp) :: L ! The L factor at a given height, used in model 2 and 3.
   real(dp) :: du_dz, dv_dz ! Derivatives of the wind speeds with regards to height
+  real(dp) :: dtheta_dz ! Derivative of the temperature with regards to height.
   real(dp) :: half_height ! Height in the in-between level
-
+  real(dp), dimension(nz-1) :: richard ! Richardsons number for thermal stability.
+  real(dp) :: f_m ! Function value of Richardsons number for wind
+  real(dp) :: f_h ! Function value of Richardsons number for diffusion
 
   select case (model_number)
   case (1)
@@ -466,10 +470,33 @@ subroutine K_values(K_m,K_m_half,K_h,K_h_half)
       half_height = half_z(hh(i), hh(i + 1))
       L = vonk * half_height / (1 + (vonk * half_height / lambda))
       K_m_half(i) = L**2 * dv_bar_dt
-      K_h_half(i) = L**2 * dv_bar_dt
+      K_h_half(i) = K_m_half(i)
     end do
   case (3)
-
+    do i = 1, nz-1
+      du_dz = (uwind(i + 1) - uwind(i)) / (hh(i + 1) - hh(i))
+      dv_dz = (vwind(i + 1) - vwind(i)) / (hh(i + 1) - hh(i))
+      dtheta_dz = (theta(i + 1) - theta(i)) / (hh(i + 1) - hh(i))
+      dv_bar_dt = sqrt(du_dz**2 + dv_dz**2)
+      half_height = half_z(hh(i), hh(i + 1))
+      L = vonk * half_height / (1 + (vonk * half_height / lambda))
+      richard(i) = (grav / theta(i)) * dtheta_dz / (du_dz**2 + dv_dz**2)
+      if (richard(i) < 0.0) then
+        f_m = sqrt(1 - 16 * richard(i))
+        f_h = (1 - 16 * richard(i))**(3.0/4.0)
+      else if (richard(i) < 0.2 .and. richard(i) >= 0.0) then
+        f_m = max((1 - 5 * richard(i))**2, 0.1_dp)
+        f_h = f_m
+      else if (richard(i) >= 0.2) then
+        f_m = 0.1_dp
+        f_h = f_m
+      end if
+      K_m_half(i) = L**2 * dv_bar_dt * f_m
+      !if (i == 10) then
+      !  write(*,*) K_m_half(10), f_m, richard
+      !end if
+      K_h_half(i) = L**2 * dv_bar_dt * f_h
+    end do
   end select
 
 end subroutine K_values
