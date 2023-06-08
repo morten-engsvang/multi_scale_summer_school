@@ -144,11 +144,10 @@ do while (time <= time_end)
 
   ! Update meteorology
 
+  ! Determine the K_values at this time
+  call K_values(K_m,K_m_half,K_h,K_h_half)
   ! First the change of wind speeds, du_dt, dv_dt, du_dt_half, dv_dt_half
   call wind_derivatives(uwind,vwind,du_dt,dv_dt)
-  
-  ! Determine the K_values at this time with the updated derivatives
-  call K_values(K_m,K_m_half,K_h,K_h_half)
 
   ! Then the update of temperature diffusion
   ! Once again boundary conditions are defined and constant.
@@ -447,6 +446,7 @@ subroutine K_values(K_m,K_m_half,K_h,K_h_half)
   real(dp) :: dv_bar_dt ! Absolute value of the derivatives of the wind values at a given height
   real(dp) :: L ! The L factor at a given height, used in model 2 and 3.
   real(dp) :: du_dz, dv_dz ! Derivatives of the wind speeds with regards to height
+  real(dp) :: half_height ! Height in the in-between level
 
 
   select case (model_number)
@@ -463,7 +463,8 @@ subroutine K_values(K_m,K_m_half,K_h,K_h_half)
       du_dz = (uwind(i + 1) - uwind(i)) / (hh(i + 1) - hh(i))
       dv_dz = (vwind(i + 1) - vwind(i)) / (hh(i + 1) - hh(i))
       dv_bar_dt = sqrt(du_dz**2 + dv_dz**2)
-      L = vonk * hh(i) / (1 + (vonk * hh(i)) / lambda)
+      half_height = half_z(hh(i), hh(i + 1))
+      L = vonk * half_height / (1 + (vonk * half_height / lambda))
       K_m_half(i) = L**2 * dv_bar_dt
       K_h_half(i) = L**2 * dv_bar_dt
     end do
