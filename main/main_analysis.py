@@ -71,7 +71,6 @@ def PlotHeatMapNorm(hh,time,data,xlabel,ylabel):
     plt.colorbar(ticks=[-1,0,5,50,100,200,300])
     
     
-    
 hh = tools.ReadGeneralData("output/hh.dat")
 uwind = tools.ReadGeneralData("output/uwind.dat")
 vwind = tools.ReadGeneralData("output/vwind.dat")
@@ -80,6 +79,7 @@ K_m = tools.ReadGeneralData("output/K_m.dat")
 K_h = tools.ReadGeneralData("output/K_h.dat")
 richard = tools.ReadGeneralData("output/richard.dat")
 time = tools.ReadGeneralData("output/time.dat")
+
 Plot(hh,uwind,"Wind speed [m/s]","Height [m]",1)
 Plot(hh,uwind,"Wind speed [m/s]","Height [m]",5)
 Plot(hh,vwind,"Wind speed [m/s]","Height [m]",1)
