@@ -65,6 +65,8 @@ subroutine chemistry_step(conc,time1,time2,O2_in,N2_in,M_in,H2O_in,TEMP_in,exp_c
   call dlsode (f_lsode, neq, conc, time1b, time2, itol, rtol, atol, itask, &
                istate, iopt, rwork, lrw, iwork, liw, dummy, mf)
 
+  ! We need to include the dlsode somewhere in order to do this
+
 end subroutine chemistry_step
 
 
@@ -123,16 +125,58 @@ subroutine f_lsode(neq, time, conc, conc_dot)
   real(dp), intent(in)  :: time
   real(dp), intent(in)  :: conc(neq)
   real(dp), intent(out) :: conc_dot(neq)
+  real(dp), dimension(nreact) :: r_rate ! Reaction rates
+
+  ! First I calculate the reactions rates:
+  r_rate(1) = k_rate(1) * conc(1)                                                                                 ! O3 = O1D + O2
+  r_rate(2) = k_rate(2) * conc(2) * H2O                                                                           ! O1D + H2O = OH + OH
+  r_rate(3) = k_rate(3) * conc(2) * N2                                                                            ! O1D + N2 = O3 + REST
+  r_rate(4) = k_rate(4) * conc(2) * O2                                                                            ! O1D + O2 = O3
+  r_rate(5) = k_rate(5) * conc(5)                                                                                 ! NO2 = NO + O3 + REST
+  r_rate(6) = k_rate(6) * conc(7)                                                                                 ! CH2O = HO2 + REST
+  r_rate(7) = k_rate(7) * conc(3) * conc(9)                                                                       ! OH + CO = HO2 + CO2 + REST
+  r_rate(8) = k_rate(8) * conc(3) * conc(11)                                                                      ! OH + CH4 = CH3O2 + REST
+  r_rate(9) = k_rate(9) * conc(13)                                                                                ! isoprene + OH = RO2
+  r_rate(10) = k_rate(10) * conc(3) * conc(15)                                                                    ! OH + MVK = HO2 + CH2O + REST
+  r_rate(11) = k_rate(11) * conc(8) * conc(6)                                                                     ! HO2 + NO = OH + NO2                                              
+  r_rate(12) = k_rate(12) * conc(12) * conc(6)                                                                    ! CH3O2 + NO = HO2 + NO2 + CH2O + REST
+  r_rate(13) = k_rate(13) * conc(14) * conc(6)                                                                    ! RO2 + NO = HO2 + NO2 + CH2O + MVK
+  r_rate(14) = k_rate(14) * conc(3) * conc(7)                                                                     ! OH + CH2O = HO2 + REST
+  r_rate(15) = k_rate(15) * conc(8)**2                                                                            ! 2HO2 = H2O2 + O2
+  r_rate(16) = k_rate(16) * conc(12) * conc(8)                                                                    ! CH3O2 + HO2 = REST
+  r_rate(17) = k_rate(17) * conc(14) * conc(8)                                                                    ! RO2 + HO2 = REST
+  r_rate(18) = k_rate(18) * conc(3) * conc(5)                                                                     ! OH + NO2 = HNO3
+  r_rate(19) = k_rate(19) * conc(6) * conc(1)                                                                     ! NO + O3 = NO2 + O2
+  r_rate(20) = k_rate(20) * conc(3) * conc(8)                                                                     ! OH + HO2 = H2O + O2
+  r_rate(21) = k_rate(21) * conc(3) * conc(16)                                                                    ! OH + H2O2 = H2O + HO2
+  r_rate(22) = k_rate(22) * conc(6) * conc(18)                                                                    ! NO + NO3 = NO2 + NO2
+  r_rate(23) = k_rate(23) * conc(5) * conc(1)                                                                     ! NO2 + O3 = NO3 + O2
+  r_rate(24) = k_rate(24) * conc(5) * conc(18)                                                                    ! NO2 + NO3 = N2O5
+  r_rate(25) = k_rate(25) * conc(19)                                                                              ! N2O5 = NO2 + NO3
+  r_rate(26) = k_rate(26) * conc(19) * H2O                                                                        ! N2O5 + H2O = HNO3 + HNO3
+  r_rate(27) = k_rate(27) * conc(19) * H2O**2                                                                     ! N2O5 + H2O + H2O = HNO3 + HNO3 + H2O
+  r_rate(28) = k_rate(28) * conc(8) * conc(1)                                                                     ! HO2 + O3 = OH + O2 + O2
+  r_rate(29) = k_rate(29) * conc(20) * conc(3)                                                                    ! SO2 + OH = H2SO4
+  r_rate(30) = k_rate(30) * conc(21)                                                                              ! H2SO4 = H2SO4_P
+  r_rate(31) = k_rate(31)                                                                                         ! Emission rate of alpha-pinene
+  r_rate(32) = k_rate(32)                                                                                         ! Emission rate of isoprene
+  r_rate(33) = k_rate(33) * conc(3) * conc(23)                                                                    ! OH + Alpha-pinene = Rest
+  r_rate(34) = k_rate(34) * conc(1) * conc(23)                                                                    ! O3 + Alpha-pinene = Rest
+  r_rate(35) = k_rate(35) * conc(13)                                                                              ! isoprene + O3
+  r_rate(36) = k_rate(36) * conc(25)                                                                              ! ELVOC = ELVOC_P
+
 
   ! 1 = O3
   conc_dot(1)  = 0.0d0
 
   ! 2 = O1D
-  conc_dot(2)  = k_rate(1)*conc(1) - k_rate(2)*conc(2)*H2O - k_rate(3)*conc(2)*N2 - k_rate(4)*conc(2)*O2
+  conc_dot(2)  = r_rate(1) - r_rate(2) - r_rate(3) - r_rate(4)
 
   ! 3 = OH
-  !conc_dot(3)  = ???
-
+  conc_dot(3) = 2 * r_rate(2) - r_rate(7) - r_rate(8) - r_rate(9) - r_rate(10) + r_rate(11)&
+              - r_rate (14) - r_rate(18) - r_rate(20) - r_rate(21) + r_rate(28) - r_rate(29)&
+              - r_rate(33)
+  
   ! 4 = REST
   conc_dot(4)  = 0.0d0
 
@@ -143,10 +187,12 @@ subroutine f_lsode(neq, time, conc, conc_dot)
   conc_dot(6)  = 0.0d0
 
   ! 7 = CH2O
-  !conc_dot(7)  = ???
+  conc_dot(7)  = -r_rate(6) + r_rate(10) + r_rate(12) + r_rate(13) - r_rate(14)
 
   ! 8 = HO2
-  !conc_dot(8)  = ???
+  conc_dot(8)  = r_rate(6) + r_rate(7) + r_rate(10) - r_rate(11) + r_rate(12) + r_rate(13)&
+                + r_rate(14) - 2 * r_rate(15) - r_rate(16) - r_rate(17) - r_rate(20)&
+                + r_rate(21) - r_rate(28)
 
   ! 9 = CO
   conc_dot(9)  = 0.0d0
@@ -158,46 +204,47 @@ subroutine f_lsode(neq, time, conc, conc_dot)
   conc_dot(11) = 0.0d0
 
   ! 12 = CH3O2
-  !conc_dot(12) = ???
+  conc_dot(12) = r_rate(8) - r_rate(12) - r_rate(16)
 
   ! 13 = Isoprene
   conc_dot(13) = 0.0d0
 
   ! 14 = RO2
-  !conc_dot(14) = ???
+  conc_dot(14) = r_rate(9) - r_rate(13) - r_rate(17)
 
   ! 15 = MVK
-  !conc_dot(15) = ???
+  conc_dot(15) = -r_rate(10) + r_rate(13)
 
   ! 16 = H2O2
-  !conc_dot(16) = ???
+  conc_dot(16) = r_rate(15) - r_rate(21)
 
   ! 17 = HNO3
-  !conc_dot(17) = ???
+  conc_dot(17) = r_rate(18) + 2 * r_rate(26) + 2 * r_rate(27)
 
   ! 18 = NO3
-  !conc_dot(18) = ???
+  conc_dot(18) = -r_rate(22) + r_rate(23) - r_rate(24) + r_rate(25)
 
   ! 19 = N2O5
-  !conc_dot(19) = ???
+  conc_dot(19) = r_rate(24) - r_rate(25) - r_rate(26) - r_rate(27)
 
   ! 20 = SO2
   conc_dot(20) = 0.0d0
 
   ! 21 = H2SO4
-  !conc_dot(21) = ???
+  conc_dot(21) = r_rate(29) - r_rate(30)
 
   !22 = H2SO4_P
-  !conc_dot(22) = ???
+  conc_dot(22) = r_rate(30)
 
   ! 23 = Alpha-pinene
   conc_dot(23) = 0.0d0
 
   !24 = HNO3_P
   !conc_dot(24) = ???
+  ! There is no reaction rate for this??
 
   !25 = ELVOC
-  !conc_dot(25) = ???
+  conc_dot(25) = -r_rate(36)
 
 end subroutine f_lsode
 
