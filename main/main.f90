@@ -582,7 +582,6 @@ subroutine calc_emission_rates(emission_monoterpene,emission_isoprene,theta,time
   gamma_monoterpene = exp(beta * (temp(2) - T_S))
   emission_monoterpene = D_m * emission_factor * gamma_monoterpene * delta * 10.0**(-9) / (60 * 60 * molar_mass_monoterpene) &
                         * (NA / (100 * (hh(2) - hh(1))))
-  write(*,*) daynumber, gamma_isoprene, gamma_monoterpene
 end subroutine
 
 subroutine wind_derivatives(uwind,vwind,du_dt,dv_dt)
