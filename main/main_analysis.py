@@ -19,7 +19,6 @@ def Plot(hh,data,xlabel,ylabel,day):
     axis.set_prop_cycle(custom_cycler)
     axis.set_xlabel(xlabel)
     axis.set_ylabel(ylabel)
-    #axis.set_ylabel("Binding free energy " + unit)
     #plt.grid(visible=True)
     #axis.xaxis.set_minor_locator(MultipleLocator(1))
     #axis.set_xticks([0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30])
@@ -40,6 +39,20 @@ def Plot(hh,data,xlabel,ylabel,day):
     
     plt.legend()
     #plt.savefig("three_body.pdf", format="pdf", bbox_inches="tight")
+
+def PlotEmissions(time,data1,data2,xlabel,ylabel,labels):
+    fig, axis = plt.subplots()
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
+    custom_cycler = cycler(color=colors)
+    axis.set_prop_cycle(custom_cycler)
+    axis.set_xlabel(xlabel)
+    axis.set_ylabel(ylabel)
+    axis.set_xlim([3,5])
+    
+    plt.plot(time[:,0],data1[:,0], label=labels[0])
+    plt.plot(time[:,0],data2[:,0], label=labels[1])
+    plt.legend(loc="lower right")
+    plt.savefig("test.pdf")
 
 def PlotHeatMap(hh,time,data,xlabel,ylabel):
     fig, axis = plt.subplots()
@@ -79,14 +92,19 @@ K_m = tools.ReadGeneralData("output/K_m.dat")
 K_h = tools.ReadGeneralData("output/K_h.dat")
 richard = tools.ReadGeneralData("output/richard.dat")
 time = tools.ReadGeneralData("output/time.dat")
+emission_isoprene = tools.ReadGeneralData("output/emission_isoprene.dat")
+emission_monoterpene = tools.ReadGeneralData("output/emission_monoterpene.dat")
 
-Plot(hh,uwind,"Wind speed [m/s]","Height [m]",1)
-Plot(hh,uwind,"Wind speed [m/s]","Height [m]",5)
-Plot(hh,vwind,"Wind speed [m/s]","Height [m]",1)
-Plot(hh,vwind,"Wind speed [m/s]","Height [m]",5)
-Plot(hh,theta,"Potential Temperature [K]","Height [m]",1)
-Plot(hh,theta,"Potential Temperature [K]","Height [m]",5)
-PlotHeatMap(hh,time,K_m,"Time [days]","Height [m]")
-PlotHeatMap(hh,time,K_h,"Time [days]","Height [m]")
-PlotHeatMap(hh,time,richard,"Time [days]","Height [m]")
-PlotHeatMapNorm(hh,time,richard,"Time [days]","Height [m]")
+
+# Plot(hh,uwind,"Wind speed [m/s]","Height [m]",1)
+# Plot(hh,uwind,"Wind speed [m/s]","Height [m]",5)
+# Plot(hh,vwind,"Wind speed [m/s]","Height [m]",1)
+# Plot(hh,vwind,"Wind speed [m/s]","Height [m]",5)
+# Plot(hh,theta,"Potential Temperature [K]","Height [m]",1)
+# Plot(hh,theta,"Potential Temperature [K]","Height [m]",5)
+# PlotHeatMap(hh,time,K_m,"Time [days]","Height [m]")
+# PlotHeatMap(hh,time,K_h,"Time [days]","Height [m]")
+# PlotHeatMap(hh,time,richard,"Time [days]","Height [m]")
+# PlotHeatMapNorm(hh,time,richard,"Time [days]","Height [m]")
+labels = ["isoprene","monoterpene"]
+PlotEmissions(time, emission_isoprene, emission_monoterpene, "Time [days]", "Emission Rate [molec * cm$^-3$ * s$^-1$]",labels)

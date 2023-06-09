@@ -94,6 +94,7 @@ real(dp) :: time_start_aerosol     ! [s], time to start calculating aerosol
 
 integer :: daynumber_start  ! [day], start day of year
 integer :: daynumber        ! [day], current day of year
+integer :: days
 
 integer :: counter  ! [-], counter of time steps
 
@@ -118,7 +119,9 @@ real(dp), dimension(nz-1) :: richard = 0.0_dp ! Richardson number for thermal st
 real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp at integer values
 real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to temp at integer values
 real(dp), dimension(nz) :: dtheta_dt ! Derivative of theta with regards to temp
-! real(dp), dimension(nz) :: dc_dt ! Derivative of scalar concentration with regards to temp                     
+! real(dp), dimension(nz) :: dc_dt ! Derivative of scalar concentration with regards to temp  
+real(dp) :: emission_isoprene = 0.0_dp ! Emission rate of isoprene for a given time step
+real(dp) :: emission_monoterpene = 0.0_dp ! Emission rate of alpha-pinene for a given time step.                   
 
 integer :: i, j  ! used for loops
 
@@ -137,6 +140,9 @@ call write_files(time)   ! write initial values
 ! Start main loop
 !-----------------------------------------------------------------------------------------
 do while (time <= time_end)
+  ! Passage of time:
+  days = aint(time / (24*60*60)) ! truncates time / 24 to the integer, i.e. only increments from 0 when 24 hours passes
+  daynumber = daynumber_start + days ! increases the day number if 24 hours passes.
   !---------------------------------------------------------------------------------------
   ! Meteorology
   !---------------------------------------------------------------------------------------
@@ -174,6 +180,7 @@ do while (time <= time_end)
   if ( use_emission .and. time >= time_start_emission ) then
     if ( mod( nint((time - time_start_emission)*1000.0d0), nint(dt_emis*1000.0d0) ) == 0 ) then
       ! Calculate emission rates
+      call calc_emission_rates(emission_monoterpene,emission_isoprene,theta,time,daynumber)
     end if
   end if
 
@@ -294,6 +301,9 @@ subroutine open_files()
   open(13,file=trim(adjustl(output_dir))//'/K_m.dat',status='replace',action='write')
   open(14,file=trim(adjustl(output_dir))//'/K_h.dat',status='replace',action='write')
   open(15,file=trim(adjustl(output_dir))//'/richard.dat',status='replace',action='write')
+
+  open(16,file=trim(adjustl(output_dir))//'/emission_isoprene.dat',status='replace',action='write')
+  open(17,file=trim(adjustl(output_dir))//'/emission_monoterpene.dat',status='replace',action='write')
 end subroutine open_files
 
 
@@ -326,6 +336,9 @@ subroutine write_files(time)
   write(13, outfmt_mid_level     ) K_m_half
   write(14, outfmt_mid_level     ) K_h_half
   write(15, outfmt_mid_level     ) richard
+
+  write(16, outfmt_level     ) emission_isoprene
+  write(17, outfmt_level     ) emission_monoterpene
 end subroutine write_files
 
 
@@ -343,6 +356,8 @@ subroutine close_files()
   close(13)
   close(14)
   close(15)
+  close(16)
+  close(17)
 end subroutine close_files
 
 
@@ -519,6 +534,56 @@ subroutine K_values(K_m,K_m_half,K_h,K_h_half,richard)
 
 end subroutine K_values
 
+subroutine calc_emission_rates(emission_monoterpene,emission_isoprene,theta,time,daynumber)
+  implicit none
+  real(dp) :: emission_isoprene ! Emission rate of isoprene for a given time step
+  real(dp) :: emission_monoterpene ! Emission rate of alpha-pinene for a given time step.
+  real(dp), dimension(nz) :: theta ! [K], potential temperature
+  real(dp) :: time ! [s], current time
+  integer :: daynumber ! [day], current day of year
+  real(dp) :: PAR ! [unit!!] Photosynthesis Active Radiation 
+  real(dp) :: gamma_isoprene
+  real(dp) :: gamma_monoterpene
+  real(dp) :: C_L
+  real(dp) :: C_T
+  ! Empirical constants for the equations:
+  real(dp), parameter :: alpha = 0.0027_dp ! Unitless
+  real(dp), parameter :: beta = 0.09_dp ! [K^-1]
+  real(dp), parameter :: C_L1 = 1.006_dp ! Unitless
+  real(dp), parameter :: C_T1 = 95.0_dp*1000.0_dp ! [J/mol]
+  real(dp), parameter :: C_T2 = 230.0_dp*1000.0_dp ! [J/mol]
+  real(dp), parameter :: T_S = 303.15_dp ! [K]
+  real(dp), parameter :: T_M = 314.0_dp ! [K]
+  real(dp), parameter :: D_m = 0.0538_dp ! [g(dry mass)/cm^2] Standing leaf biomass, distributed between levels 1 and 2.
+  real(dp), parameter :: emission_factor = 100_dp ! [ng(VOC) / ( g(needle dry mass) * h ) ]
+  real(dp), parameter :: delta = 1.0_dp ! Emission activity factor for long term control
+
+  real(dp), parameter :: molar_mass_isoprene = 68.12_dp ! [g/mol] molarmass of C5H8
+  real(dp), parameter :: molar_mass_monoterpene = 136.24_dp ! [g/mol] molarmass of C10H16
+
+  ! First get the PAR value:
+  PAR = 1000*get_exp_coszen(time,daynumber,latitude)
+
+  ! Find the real air temperatures, using the simplified equation and the originally initiated temp vector:
+  temp = theta - (grav/Cp)*hh 
+  ! We use the temperature at level 2 (between 5-15 m)
+
+  ! First I calculate the isoprene emission:
+  C_L = alpha * C_L1 * PAR / (sqrt(1 + alpha**2 * PAR**2))
+  C_T = exp(C_T1 * (temp(2) - T_S) / (Rgas * temp(2) * T_S)) / (1 + exp(C_T2 * (temp(2) - T_M) / (Rgas * temp(2) * T_S)))
+  gamma_isoprene = C_L*C_T
+  
+  ! Calculate the emission flux, convert ng to g, h to s, g to mol, mol to molecules.
+  ! Finally divide it by the height interval (between level 1 and 2) to get it per volume (# cm^-3 s^-1)
+  emission_isoprene = D_m * emission_factor * gamma_isoprene * delta * 10.0**(-9) / (60 * 60 * molar_mass_isoprene) &
+                      * (NA / (100 * (hh(2) - hh(1))))
+  
+  ! Then monoterpene:
+  gamma_monoterpene = exp(beta * (temp(2) - T_S))
+  emission_monoterpene = D_m * emission_factor * gamma_monoterpene * delta * 10.0**(-9) / (60 * 60 * molar_mass_monoterpene) &
+                        * (NA / (100 * (hh(2) - hh(1))))
+  write(*,*) daynumber, gamma_isoprene, gamma_monoterpene
+end subroutine
 
 subroutine wind_derivatives(uwind,vwind,du_dt,dv_dt)
 real(dp), dimension(nz) :: uwind, &  ! [m s-1], u component of wind
