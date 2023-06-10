@@ -131,7 +131,7 @@ real(dp), dimension(nz) :: Mair ! [molecules/cm3] Air molecules concentration at
 real(dp), dimension(nz) :: O2 ! [molecules/cm3] Oxygen concentration at each level
 real(dp), dimension(nz) :: N2 ! [molecules/cm3] Nitrogen concentration at each level
 real(dp), dimension(nz) :: H2O ! [molecules/cm3] Water concentration at each level
-real(dp), dimension(neq,nz) :: concentration ! [molecules/cm3] Chemical species concentrations (column) for each level (row)
+real(dp), dimension(nz,neq) :: concentration ! [molecules/cm3] Chemical species concentrations (column) for each level (row)
 
 integer :: i, j  ! used for loops
 
@@ -142,6 +142,7 @@ integer :: i, j  ! used for loops
 
 call time_init()                 ! initialize time
 call meteorology_init()          ! initialize meteorology
+call chemistry_init()            ! initialize chemistry
 
 call open_files()        ! open output files
 call write_files(time)   ! write initial values
@@ -314,6 +315,14 @@ subroutine open_files()
 
   open(16,file=trim(adjustl(output_dir))//'/emission_isoprene.dat',status='replace',action='write')
   open(17,file=trim(adjustl(output_dir))//'/emission_monoterpene.dat',status='replace',action='write')
+
+  open(18,file=trim(adjustl(output_dir))//'/alpha_pinene.dat',status='replace',action='write')
+  open(19,file=trim(adjustl(output_dir))//'/isoprene.dat',status='replace',action='write')
+  open(20,file=trim(adjustl(output_dir))//'/oh_radical.dat',status='replace',action='write')
+  open(21,file=trim(adjustl(output_dir))//'/ho2_radical.dat',status='replace',action='write')
+  open(22,file=trim(adjustl(output_dir))//'/h2so4.dat',status='replace',action='write')
+  open(23,file=trim(adjustl(output_dir))//'/elvoc.dat',status='replace',action='write')
+
 end subroutine open_files
 
 
@@ -349,6 +358,14 @@ subroutine write_files(time)
 
   write(16, outfmt_level     ) emission_isoprene
   write(17, outfmt_level     ) emission_monoterpene
+
+  write(18,outfmt_level) concentration(:,23)
+  write(19,outfmt_level) concentration(:,13)
+  write(20,outfmt_level) concentration(:,3)
+  write(21,outfmt_level) concentration(:,8)
+  write(22,outfmt_level) concentration(:,21)
+  write(23,outfmt_level) concentration(:,25)
+
 end subroutine write_files
 
 
@@ -368,6 +385,12 @@ subroutine close_files()
   close(15)
   close(16)
   close(17)
+  close(18)
+  close(19)
+  close(20)
+  close(21)
+  close(22)
+  close(23)
 end subroutine close_files
 
 
@@ -439,12 +462,12 @@ subroutine chemistry_init()
   ! Set initial concentrations under the assumption that the mixing ratio
   ! is homogenous throughout the air parcel
   do i = 1, nz
-    concentration(1,i) = 24.0_dp * Mair(i) * ppb ! O3 concentration
-    concentration(5,i) = 0.2_dp * Mair(i) * ppb ! NO2 concentration
-    concentration(6,i) = 0.07_dp * Mair(i) * ppb ! NO concentration
-    concentration(9,i) = 100.0_dp * Mair(i) * ppb ! CO concentration
-    concentration(11,i) = 1759.0_dp * Mair(i) * ppb ! CH4 concentration
-    concentration(20,i) = 0.5_dp * Mair(i) * ppb ! SO2 concentration
+    concentration(i,1) = 24.0_dp * Mair(i) * ppb ! O3 concentration
+    concentration(i,5) = 0.2_dp * Mair(i) * ppb ! NO2 concentration
+    concentration(i,6) = 0.07_dp * Mair(i) * ppb ! NO concentration
+    concentration(i,9) = 100.0_dp * Mair(i) * ppb ! CO concentration
+    concentration(i,11) = 1759.0_dp * Mair(i) * ppb ! CH4 concentration
+    concentration(i,20) = 0.5_dp * Mair(i) * ppb ! SO2 concentration
   end do
 
 end subroutine

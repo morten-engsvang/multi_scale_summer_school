@@ -84,6 +84,18 @@ def PlotHeatMapNorm(hh,time,data,xlabel,ylabel):
     plt.colorbar(ticks=[-1,0,5,50,100,200,300])
     
     
+def PlotConcentrations(time,data,xlabel,ylabel,species):
+    fig, axis = plt.subplots()
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
+    custom_cycler = cycler(color=colors)
+    axis.set_prop_cycle(custom_cycler)
+    axis.set_xlabel(xlabel)
+    axis.set_ylabel(ylabel)
+    axis.set_xlim([0,5])
+    plt.plot(time[:,0],data[:,0])
+    plt.title(species)
+
+
 hh = tools.ReadGeneralData("output/hh.dat")
 uwind = tools.ReadGeneralData("output/uwind.dat")
 vwind = tools.ReadGeneralData("output/vwind.dat")
@@ -92,9 +104,16 @@ K_m = tools.ReadGeneralData("output/K_m.dat")
 K_h = tools.ReadGeneralData("output/K_h.dat")
 richard = tools.ReadGeneralData("output/richard.dat")
 time = tools.ReadGeneralData("output/time.dat")
+
 emission_isoprene = tools.ReadGeneralData("output/emission_isoprene.dat")
 emission_monoterpene = tools.ReadGeneralData("output/emission_monoterpene.dat")
 
+alpha_pinene = tools.ReadGeneralData("output/alpha_pinene.dat")
+isoprene = tools.ReadGeneralData("output/isoprene.dat")
+oh_radical = tools.ReadGeneralData("output/oh_radical.dat")
+ho2_radical = tools.ReadGeneralData("output/ho2_radical.dat")
+h2so4 = tools.ReadGeneralData("output/h2so4.dat")
+elvoc = tools.ReadGeneralData("output/elvoc.dat")
 
 # Plot(hh,uwind,"Wind speed [m/s]","Height [m]",1)
 # Plot(hh,uwind,"Wind speed [m/s]","Height [m]",5)
@@ -106,5 +125,11 @@ emission_monoterpene = tools.ReadGeneralData("output/emission_monoterpene.dat")
 # PlotHeatMap(hh,time,K_h,"Time [days]","Height [m]")
 # PlotHeatMap(hh,time,richard,"Time [days]","Height [m]")
 # PlotHeatMapNorm(hh,time,richard,"Time [days]","Height [m]")
-labels = ["isoprene","monoterpene"]
-PlotEmissions(time, emission_isoprene, emission_monoterpene, "Time [days]", "Emission Rate [molec * cm$^-3$ * s$^-1$]",labels)
+# labels = ["isoprene","monoterpene"]
+# PlotEmissions(time, emission_isoprene, emission_monoterpene, "Time [days]", "Emission Rate [molec * cm$^-3$ * s$^-1$]",labels)
+PlotConcentrations(time, alpha_pinene, "time [days]", "concentration [molecules*cm$^-3$*s$^-1$]", "alpha-pinene")
+PlotConcentrations(time, isoprene, "time [days]", "concentration [molecules*cm$^-3$*s$^-1$]", "isoprene")
+PlotConcentrations(time, oh_radical, "time [days]", "concentration [molecules*cm$^-3$*s$^-1$]", "OH")
+PlotConcentrations(time, ho2_radical, "time [days]", "concentration [molecules*cm$^-3$*s$^-1$]", "HO2")
+PlotConcentrations(time, h2so4, "time [days]", "concentration [molecules*cm$^-3$*s$^-1$]", "H2SO4")
+PlotConcentrations(time, elvoc, "time [days]", "concentration [molecules*cm$^-3$*s$^-1$]", "ELVOC")
