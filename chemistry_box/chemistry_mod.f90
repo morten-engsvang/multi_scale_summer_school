@@ -136,7 +136,7 @@ subroutine f_lsode(neq, time, conc, conc_dot)
   r_rate(6) = k_rate(6) * conc(7)                                                                                 ! CH2O = HO2 + REST
   r_rate(7) = k_rate(7) * conc(3) * conc(9)                                                                       ! OH + CO = HO2 + CO2 + REST
   r_rate(8) = k_rate(8) * conc(3) * conc(11)                                                                      ! OH + CH4 = CH3O2 + REST
-  r_rate(9) = k_rate(9) * conc(13)                                                                                ! isoprene + OH = RO2
+  r_rate(9) = k_rate(9) * conc(13) * conc(3)                                                                      ! isoprene + OH = RO2
   r_rate(10) = k_rate(10) * conc(3) * conc(15)                                                                    ! OH + MVK = HO2 + CH2O + REST
   r_rate(11) = k_rate(11) * conc(8) * conc(6)                                                                     ! HO2 + NO = OH + NO2                                              
   r_rate(12) = k_rate(12) * conc(12) * conc(6)                                                                    ! CH3O2 + NO = HO2 + NO2 + CH2O + REST
@@ -157,14 +157,15 @@ subroutine f_lsode(neq, time, conc, conc_dot)
   r_rate(27) = k_rate(27) * conc(19) * H2O**2                                                                     ! N2O5 + H2O + H2O = HNO3 + HNO3 + H2O
   r_rate(28) = k_rate(28) * conc(8) * conc(1)                                                                     ! HO2 + O3 = OH + O2 + O2
   r_rate(29) = k_rate(29) * conc(20) * conc(3)                                                                    ! SO2 + OH = H2SO4
-  r_rate(30) = k_rate(30) * conc(21)                                                                              ! H2SO4 = H2SO4_P
+  r_rate(30) = k_rate(30)  ! Notice, this is made to be independent of concentration, due to two reactions        ! H2SO4 = H2SO4_P & HNO3 = HNO3_P
   r_rate(31) = k_rate(31)                                                                                         ! Emission rate of alpha-pinene
   r_rate(32) = k_rate(32)                                                                                         ! Emission rate of isoprene
   r_rate(33) = k_rate(33) * conc(3) * conc(23)                                                                    ! OH + Alpha-pinene = Rest
   r_rate(34) = k_rate(34) * conc(1) * conc(23)                                                                    ! O3 + Alpha-pinene = Rest
   r_rate(35) = k_rate(35) * conc(13)                                                                              ! isoprene + O3
-  r_rate(36) = k_rate(36) * conc(25)                                                                              ! ELVOC = ELVOC_P
-
+  r_rate(36) = 0.05_dp * k_rate(33) * conc(3) * conc(23) + 0.10 * k_rate(34) * conc(1) * conc(23) - k_rate(36) * conc(25) ! ELVOC = ELVOC_P
+  ! Additional ELVOC reactions:
+  ! ELVOC = 0.05*k(33)*OH*alpha + 0.10*k(34)*O3*alpha - k*
 
   ! 1 = O3
   conc_dot(1)  = 0.0d0
@@ -207,7 +208,7 @@ subroutine f_lsode(neq, time, conc, conc_dot)
   conc_dot(12) = r_rate(8) - r_rate(12) - r_rate(16)
 
   ! 13 = Isoprene
-  conc_dot(13) = 0.0d0
+  conc_dot(13) = 0.0d0 ! Remember to change in the full model
 
   ! 14 = RO2
   conc_dot(14) = r_rate(9) - r_rate(13) - r_rate(17)
@@ -219,7 +220,7 @@ subroutine f_lsode(neq, time, conc, conc_dot)
   conc_dot(16) = r_rate(15) - r_rate(21)
 
   ! 17 = HNO3
-  conc_dot(17) = r_rate(18) + 2 * r_rate(26) + 2 * r_rate(27)
+  conc_dot(17) = r_rate(18) + 2 * r_rate(26) + 2 * r_rate(27) - r_rate(30) * conc(17)
 
   ! 18 = NO3
   conc_dot(18) = -r_rate(22) + r_rate(23) - r_rate(24) + r_rate(25)
@@ -231,20 +232,19 @@ subroutine f_lsode(neq, time, conc, conc_dot)
   conc_dot(20) = 0.0d0
 
   ! 21 = H2SO4
-  conc_dot(21) = r_rate(29) - r_rate(30)
+  conc_dot(21) = r_rate(29) - r_rate(30) * conc(21)
 
   !22 = H2SO4_P
-  conc_dot(22) = r_rate(30)
+  conc_dot(22) = r_rate(30) * conc(21) ! Here r_rate(30) is not multiplied by concentration beforehand.
 
   ! 23 = Alpha-pinene
-  conc_dot(23) = 0.0d0
+  conc_dot(23) = 0.0d0 ! Remember to change in the full model
 
   !24 = HNO3_P
-  !conc_dot(24) = ???
-  ! There is no reaction rate for this??
+  conc_dot(24) = r_rate(30) * conc(17) ! Here r_rate(30) is not multiplied by concentration beforehand.
 
   !25 = ELVOC
-  conc_dot(25) = -r_rate(36)
+  conc_dot(25) = r_rate(36)
 
 end subroutine f_lsode
 

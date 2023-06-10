@@ -6,7 +6,7 @@ program chemistry_box
 
   integer, parameter :: dp = selected_real_kind(15,307)
 
-  real(dp) :: conc(neq)
+  real(dp) :: conc(neq) ! Remember to make this 2D when changing to the 1D model
   real(dp) :: O2, N2, Mair, H2O, TEMP, pres
   real(dp) :: exp_coszen
 
@@ -42,6 +42,8 @@ program chemistry_box
   O2   = 0.21d0*Mair                     ! Oxygen concentration [molecules/cm3]
   N2   = 0.78d0*Mair                     ! Nitrogen concentration [molecules/cm3]
   H2O  = 1.0D16                          ! Water molecules [molecules/cm3]
+  ! In the 1D model we also need to define the number concentration
+  ! as being height dependent / pressure dependent
 
   ! initial state:
   conc     = 0.0d0
@@ -50,9 +52,9 @@ program chemistry_box
   conc(6)  = 0.07d0   * Mair * ppb     ! NO
   conc(9)  = 100.0d0  * Mair * ppb     ! CO
   conc(11) = 1759.0d0 * Mair * ppb     ! CH4
-  conc(13) = 2.2d0    * Mair * ppb     ! C5H8
+  conc(13) = 2.2d0    * Mair * ppb     ! C5H8 (isoprene)
   conc(20) = 0.5d0    * Mair * ppb     ! SO2
-  conc(23) = 2.2d0    * Mair * ppb     ! alpha-pinene
+  conc(23) = 2.2d0    * Mair * ppb     ! alpha-pinene (monoterpene)
 
   daynumber_start = 31+28+31+30+31+30+10 ! day is July 10th, 2011
   daynumber = daynumber_start
@@ -75,8 +77,10 @@ program chemistry_box
   ! Open the output files and write the initial values
   open(11,file=trim(adjustl(output_dir)) // "/concentrations.dat",status='replace',action='write')
   open(12,file=trim(adjustl(output_dir)) // "/exp_coszen.dat",status='replace',action='write')
+  open(13,file=trim(adjustl(output_dir)) // "/time.dat",status='replace',action='write')
   write(11,*) conc
   write(12,*) exp_coszen
+  write(13,*) time
 
   ! Start the main loop
   do while (time < time_end)
@@ -96,6 +100,7 @@ program chemistry_box
        write(*,'(A8,F6.3,A6)') 'time = ', time/(24*one_hour), '  days'
        write(11,*) conc
        write(12,*) exp_coszen
+       write(13,*) time/(24*one_hour)
     end if
 
   end do
