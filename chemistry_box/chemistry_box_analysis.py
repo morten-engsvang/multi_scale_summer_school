@@ -20,7 +20,7 @@ def PlotConcentrations(time,data,xlabel,ylabel,labels):
         axis.set_prop_cycle(custom_cycler)
         axis.set_xlabel(xlabel)
         axis.set_ylabel(ylabel)
-        axis.set_xlim([0,5])
+        #axis.set_xlim([0,5])
         plt.plot(time[:,0],data[:,i],label=labels[i])
         plt.title(labels[i])
     #plt.legend(loc="lower right")
