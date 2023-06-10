@@ -13,6 +13,8 @@
 
 program main
 
+use chemistry_mod
+
 implicit none
 
 !-----------------------------------------------------------------------------------------
@@ -46,6 +48,7 @@ real(dp), parameter :: nu_air = 1.59e-5_dp                      ! [m2 s-1], kine
 real(dp), parameter :: Omega  = 2*PI/(24.0_dp*60.0_dp*60.0_dp)  ! [rad s-1], Earth angular speed
 real(dp), parameter :: lambda = 300.0_dp                        ! maximum mixing length, meters
 real(dp), parameter :: vonk   = 0.4_dp                          ! von Karman constant, dimensionless
+real(dp), parameter :: ppb = 1e-9_dp                            ! Parts per billion
 
 real(dp), parameter :: ug = 10.0d0, vg = 0.0d0  ! [m s-1], geostrophic wind
 
@@ -121,7 +124,14 @@ real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to temp at integ
 real(dp), dimension(nz) :: dtheta_dt ! Derivative of theta with regards to temp
 ! real(dp), dimension(nz) :: dc_dt ! Derivative of scalar concentration with regards to temp  
 real(dp) :: emission_isoprene = 0.0_dp ! Emission rate of isoprene for a given time step
-real(dp) :: emission_monoterpene = 0.0_dp ! Emission rate of alpha-pinene for a given time step.                   
+real(dp) :: emission_monoterpene = 0.0_dp ! Emission rate of alpha-pinene for a given time step.   
+
+! Chemistry vectors and matrixes:
+real(dp), dimension(nz) :: Mair ! [molecules/cm3] Air molecules concentration at each level.
+real(dp), dimension(nz) :: O2 ! [molecules/cm3] Oxygen concentration at each level
+real(dp), dimension(nz) :: N2 ! [molecules/cm3] Nitrogen concentration at each level
+real(dp), dimension(nz) :: H2O ! [molecules/cm3] Water concentration at each level
+real(dp), dimension(neq,nz) :: concentration ! [molecules/cm3] Chemical species concentrations (column) for each level (row)
 
 integer :: i, j  ! used for loops
 
@@ -418,6 +428,26 @@ subroutine meteorology_init()
   pres = barometric_law(p00, temp, hh)
 end subroutine meteorology_init
 
+subroutine chemistry_init()
+  temp = theta - (grav/Cp)*hh
+  pres = barometric_law(p00, temp, hh)
+  concentration = 0.0_dp
+  ! Determine the concentration of air for each height
+  do i = 1, nz
+    Mair(i) = pres(i)*NA / (Rgas*temp(i)) * 1d-6
+  end do
+  ! Set initial concentrations under the assumption that the mixing ratio
+  ! is homogenous throughout the air parcel
+  do i = 1, nz
+    concentration(1,i) = 24.0_dp * Mair(i) * ppb ! O3 concentration
+    concentration(5,i) = 0.2_dp * Mair(i) * ppb ! NO2 concentration
+    concentration(6,i) = 0.07_dp * Mair(i) * ppb ! NO concentration
+    concentration(9,i) = 100.0_dp * Mair(i) * ppb ! CO concentration
+    concentration(11,i) = 1759.0_dp * Mair(i) * ppb ! CH4 concentration
+    concentration(20,i) = 0.5_dp * Mair(i) * ppb ! SO2 concentration
+  end do
+
+end subroutine
 
 !-----------------------------------------------------------------------------------------
 ! Get the surface values from the input data file
@@ -609,6 +639,16 @@ do i = 2, nz - 1
 end do
 
 end subroutine wind_derivatives
+
+subroutine chemistry_1D()
+  temp = theta - (grav/Cp)*hh
+  pres = barometric_law(p00, temp, hh)
+  
+  do i = 1, nz
+
+  end do
+
+end subroutine
 !-----------------------------------------------------------------------------------------
 ! Calculate the radiation related quantities
 !-----------------------------------------------------------------------------------------
