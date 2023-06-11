@@ -52,7 +52,7 @@ def PlotEmissions(time,data1,data2,xlabel,ylabel,labels):
     plt.plot(time[:,0],data1[:,0], label=labels[0])
     plt.plot(time[:,0],data2[:,0], label=labels[1])
     plt.legend(loc="lower right")
-    plt.savefig("test.pdf")
+    #plt.savefig("test.pdf")
 
 def PlotHeatMap(hh,time,data,xlabel,ylabel):
     fig, axis = plt.subplots()
@@ -143,8 +143,12 @@ PlotConcentrations(time, oh_radical, "time [days]", "concentration [molecules*cm
 PlotConcentrations(time, ho2_radical, "time [days]", "concentration [molecules*cm$^-3$*s$^-1$]", "HO2")
 PlotConcentrations(time, h2so4, "time [days]", "concentration [molecules*cm$^-3$*s$^-1$]", "H2SO4")
 PlotConcentrations(time, elvoc, "time [days]", "concentration [molecules*cm$^-3$*s$^-1$]", "ELVOC")
-PlotHeatMapNorm2(hh, time, oh_radical, "time [days]", "height [m]", 0, 2*10**(6), "OH")
-PlotHeatMapNorm2(hh, time, ho2_radical, "time [days]", "height [m]", 0, 1.2*10**(8), "HO2")
-PlotHeatMapNorm2(hh, time, h2so4, "time [days]", "height [m]", 0, 3.5*10**(7), "H2SO4")
-PlotHeatMapNorm2(hh, time, elvoc, "time [days]", "height [m]", 0, 1.05*10**(7), "ELVOC")
-print(np.max(oh_radical),np.max(ho2_radical),np.max(h2so4),np.max(elvoc))
+title = "OH (" + str(np.min(oh_radical)) + ", " + str(np.max(oh_radical)) + ")"
+PlotHeatMapNorm2(hh, time, oh_radical, "time [days]", "height [m]", 0, 2*10**(6), title)
+title = "HO2 (" + str(np.min(ho2_radical)) + ", " + str(np.max(ho2_radical)) + ")"
+PlotHeatMapNorm2(hh, time, ho2_radical, "time [days]", "height [m]", 0, 1.2*10**(8), title)
+title = "H2SO4 (" + str(np.min(h2so4)) + ", " + str(np.max(h2so4)) + ")"
+PlotHeatMapNorm2(hh, time, h2so4, "time [days]", "height [m]", 0, 3.5*10**(7), title)
+title = "ELVOC (" + str(np.min(elvoc)) + ", " + str(np.max(elvoc)) + ")"
+PlotHeatMapNorm2(hh, time, elvoc, "time [days]", "height [m]", 0, 1.05*10**(7), title)
+#print(np.max(oh_radical),np.max(ho2_radical),np.max(h2so4),np.max(elvoc))
