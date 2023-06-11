@@ -119,10 +119,10 @@ real(dp), dimension(nz-1) :: K_h_half = 0.0_dp ! [m/s] K_h-parameter for the int
 real(dp), dimension(nz-1) :: richard = 0.0_dp ! Richardson number for thermal stability, I only define this for half-integer values of height.
 
 ! Final vectors to store the changes
-real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp at integer values
-real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to temp at integer values
-real(dp), dimension(nz) :: dtheta_dt ! Derivative of theta with regards to temp
-! real(dp), dimension(nz) :: dc_dt ! Derivative of scalar concentration with regards to temp  
+real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to time at integer values
+real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to time at integer values
+real(dp), dimension(nz) :: dtheta_dt ! Derivative of theta with regards to time
+real(dp), dimension(nz) :: dc_dt ! Derivative of scalar concentration with regards to time  
 real(dp) :: emission_isoprene = 0.0_dp ! Emission rate of isoprene for a given time step
 real(dp) :: emission_monoterpene = 0.0_dp ! Emission rate of alpha-pinene for a given time step.   
 
@@ -131,7 +131,7 @@ real(dp), dimension(nz) :: Mair ! [molecules/cm3] Air molecules concentration at
 real(dp), dimension(nz) :: O2 ! [molecules/cm3] Oxygen concentration at each level
 real(dp), dimension(nz) :: N2 ! [molecules/cm3] Nitrogen concentration at each level
 real(dp), dimension(nz) :: H2O ! [molecules/cm3] Water concentration at each level
-real(dp), dimension(nz,neq) :: concentration ! [molecules/cm3] Chemical species concentrations (column) for each level (row)
+real(dp), dimension(nz,neq) :: concentration ! [molecules/cm3] Chemical species concentrations (row) for each level (column)
 
 integer :: i, j  ! used for loops
 
@@ -192,6 +192,9 @@ do while (time <= time_end)
     if ( mod( nint((time - time_start_emission)*1000.0d0), nint(dt_emis*1000.0d0) ) == 0 ) then
       ! Calculate emission rates
       call calc_emission_rates(emission_monoterpene,emission_isoprene,theta,time,daynumber)
+      ! Add emissions to concentrations at level 2:
+      concentration(2,13) = concentration(2,13) + emission_isoprene ! Isoprene
+      concentration(2,23) = concentration(2,23) + emission_monoterpene ! Monoterpene (alpha-pinene)
     end if
   end if
 
@@ -220,19 +223,41 @@ do while (time <= time_end)
   if ( use_chemistry .and. time >= time_start_chemistry ) then
     if ( mod( nint((time - time_start_chemistry)*1000.0d0), nint(dt_chem*1000.0d0) ) == 0 ) then
       ! Solve chemical equations for each layer except boundaries
+      call chemistry_1D(time,theta,Mair,O2,N2,concentration)
     end if  ! every dt_chem
   end if
 
   ! Update concentrations of gas phase compounds if any of these processes are considered
   ! Deposition should not be used alone because it calculates nothing in that case
   if (use_emission .or. use_chemistry) then
-    ! Trick to make bottom flux zero
+    ! Trick to make bottom flux zero, from boundary conditions
+    ! Setting concentrations at level 1 equal to level 2:
+    concentration(1,:) = concentration(2,:)
 
     ! Concentrations can not be lower than 0
+    ! TO-DO
 
     ! Mixing of chemical species
-
-    ! Set the constraints above again for output
+    ! Flux at the bottom is guaranteed to be zero due to the above.
+    ! Loop over each chemical, and inside we loop over each height-level
+    ! except for the lowest and highest
+    do i = 1, neq
+      ! Quickly initialize the concentration change vector for the new chemical:
+      dc_dt = 0.0_dp
+      do j = 2, nz-1
+        dc_dt(j) = (K_h_half(j) * ((concentration(i,j + 1) - concentration(i,j)) / (hh(j + 1) - hh(j))) - & 
+        K_h_half(j - 1) * ((concentration(i,j) - concentration(i,j - 1)) / (hh(j) - hh(j - 1)))) / ((hh(j + 1) - hh(j)) / 2)
+      end do
+      do j = 2, nz-1
+        concentration(i,j) = concentration(i,j) + dc_dt(j)
+      end do
+    end do
+    ! Set the boundary_conditions above again for output
+    ! And set top concentrations to zero, to simulate chemicals
+    ! leaving the box.
+    concentration(1,:) = concentration(2,:)
+    concentration(nz,:) = 0.0_dp
+  
   end if
 
   !---------------------------------------------------------------------------------------
@@ -640,8 +665,8 @@ end subroutine
 subroutine wind_derivatives(uwind,vwind,du_dt,dv_dt)
 real(dp), dimension(nz) :: uwind, &  ! [m s-1], u component of wind
                            vwind  ! [m s-1], v component of wind
-real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to temp at integer values
-real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to temp at integer values
+real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to time at integer values
+real(dp), dimension(nz) :: dv_dt ! Derivative of v with regards to time at integer values
 
 ! First I calculate for the integer values:
 ! Loop over the second z value to the second last, the excluded values are
@@ -663,12 +688,35 @@ end do
 
 end subroutine wind_derivatives
 
-subroutine chemistry_1D()
+subroutine chemistry_1D(time,theta,Mair,O2,N2,concentration)
+  real(dp) :: time ! [s] Current time since start
+  real(dp), dimension(nz) :: theta ! [K], potential temperature
+  real(dp), dimension(nz) :: temp ! [K], air temperature
+  real(dp), dimension(nz) :: Mair ! [molecules/cm3] Air molecules concentration at each level.
+  real(dp), dimension(nz) :: O2 ! [molecules/cm3] Oxygen concentration at each level
+  real(dp), dimension(nz) :: N2 ! [molecules/cm3] Nitrogen concentration at each level
+  real(dp), dimension(nz) :: H2O ! [molecules/cm3] Water concentration at each level
+  real(dp), dimension(nz,neq) :: concentration ! [molecules/cm3] Chemical species concentrations (row) for each level (column)
+  real(dp) :: exp_coszen
+
   temp = theta - (grav/Cp)*hh
   pres = barometric_law(p00, temp, hh)
-  
-  do i = 1, nz
+  exp_coszen = get_exp_coszen(time, daynumber, latitude)
 
+  ! Determine the concentration of air for each height
+  do i = 1, nz
+    Mair(i) = pres(i)*NA / (Rgas*temp(i)) * 1d-6
+  end do
+  ! Set initial concentrations under the assumption that the mixing ratio
+  ! is homogenous throughout the air parcel
+  do i = 1, nz
+    O2(i) = 0.21_dp * Mair(i) ! Concentrations of O2 at the different levels
+    N2(i) = 0.78_dp * Mair(i) ! Concentrations of N2 at the different levels
+  end do
+
+  ! Doing the chemistry for all the heights
+  do i = i, nz
+    call chemistry_step(concentration(i,:),time,time+dt,O2(i),N2(i),Mair(i),H2O(i),temp(i),exp_coszen) ! change
   end do
 
 end subroutine
