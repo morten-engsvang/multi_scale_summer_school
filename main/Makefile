@@ -1,7 +1,7 @@
 F90    = gfortran
-FFLAGS = -O0 -g -ffpe-trap=invalid,zero,overflow -ffree-line-length-none
+FFLAGS = -O2 -ffpe-trap=invalid,zero,overflow -ffree-line-length-none
 
-OBJS = main.o
+OBJS = main.o chemistry_mod.o opkda1.o opkda2.o opkdmain.o
 EXE  = main.exe
 
 all: $(EXE)

@@ -36,10 +36,11 @@ integer  :: iwork(liw)   ! integer workspace
 contains
 
 
-subroutine chemistry_step(conc,time1,time2,O2_in,N2_in,M_in,H2O_in,TEMP_in,exp_coszen)
+subroutine chemistry_step(conc,time1,time2,O2_in,N2_in,M_in,H2O_in,TEMP_in,exp_coszen,emission_isoprene,emission_monoterpene)
   real(dp), intent(inout) :: conc(neq)
   real(dp), intent(in)    :: time1, time2, O2_in, N2_in, M_in, H2O_in, TEMP_in
   real(dp), intent(in)    :: exp_coszen
+  real(dp) :: emission_isoprene, emission_monoterpene
 
   ! for DLSODA:
   integer  :: istate  ! a flag
@@ -60,19 +61,18 @@ subroutine chemistry_step(conc,time1,time2,O2_in,N2_in,M_in,H2O_in,TEMP_in,exp_c
   H2O = H2O_in
   TEMP =TEMP_in
 
-  call calculate_k(exp_coszen)
-
+  call calculate_k(exp_coszen,emission_isoprene,emission_monoterpene)
+  
   call dlsode (f_lsode, neq, conc, time1b, time2, itol, rtol, atol, itask, &
                istate, iopt, rwork, lrw, iwork, liw, dummy, mf)
-
-  ! We need to include the dlsode somewhere in order to do this
 
 end subroutine chemistry_step
 
 
-subroutine calculate_k(exp_coszen)
+subroutine calculate_k(exp_coszen,emission_isoprene,emission_monoterpene)
 
    real(dp), intent(in) :: exp_coszen
+   real(dp) :: emission_isoprene, emission_monoterpene
 
    k_rate(1)  = 3.83D-5*exp_coszen                                                                                ! O3 = O1D + O2
    k_rate(2)  = 1.63D-10*EXP(60/TEMP)                                                                             ! O1D + H2O = OH + OH
@@ -106,8 +106,8 @@ subroutine calculate_k(exp_coszen)
    k_rate(28) = 2.03D-16*(TEMP/300)**4.57d0*EXP(693/TEMP)                                                         ! HO2 + O3 = OH + O2 + O2
    k_rate(29) = 1.5D-12                                                                                           ! SO2 + OH = H2SO4
    k_rate(30) = 0.001d0                                                                                           ! H2SO4 = H2SO4_P
-   k_rate(31) = 0.0d0 !Emi_alp                                                                                    ! Emission rate of alpha-pinene
-   k_rate(32) = 0.0d0 !Emi_iso                                                                                    ! Emission rate of isoprene
+   k_rate(31) = emission_monoterpene                                                                              ! Emission rate of alpha-pinene
+   k_rate(32) = emission_isoprene                                                                                 ! Emission rate of isoprene
    k_rate(33) = 1.2D-11*EXP(440/TEMP)                                                                             ! OH + Alpha-pinene = Rest
    k_rate(34) = 6.3D-16*EXP(-580/TEMP)                                                                            ! O3 + Alpha-pinene = Rest
    k_rate(35) = 1.03D-14*EXP(-1995/TEMP)                                                                          ! isoprene + O3
@@ -162,10 +162,8 @@ subroutine f_lsode(neq, time, conc, conc_dot)
   r_rate(32) = k_rate(32)                                                                                         ! Emission rate of isoprene
   r_rate(33) = k_rate(33) * conc(3) * conc(23)                                                                    ! OH + Alpha-pinene = Rest
   r_rate(34) = k_rate(34) * conc(1) * conc(23)                                                                    ! O3 + Alpha-pinene = Rest
-  r_rate(35) = k_rate(35) * conc(13)                                                                              ! isoprene + O3
+  r_rate(35) = k_rate(35) * conc(13) * conc(1)                                                                    ! isoprene + O3
   r_rate(36) = 0.05_dp * k_rate(33) * conc(3) * conc(23) + 0.10 * k_rate(34) * conc(1) * conc(23) - k_rate(36) * conc(25) ! ELVOC = ELVOC_P
-  ! Additional ELVOC reactions:
-  ! ELVOC = 0.05*k(33)*OH*alpha + 0.10*k(34)*O3*alpha - k*
 
   ! 1 = O3
   conc_dot(1)  = 0.0d0
@@ -208,7 +206,7 @@ subroutine f_lsode(neq, time, conc, conc_dot)
   conc_dot(12) = r_rate(8) - r_rate(12) - r_rate(16)
 
   ! 13 = Isoprene
-  conc_dot(13) = 0.0d0 ! Remember to change in the full model
+  conc_dot(13) = r_rate(32) - r_rate(9) - r_rate(35)
 
   ! 14 = RO2
   conc_dot(14) = r_rate(9) - r_rate(13) - r_rate(17)
@@ -238,7 +236,7 @@ subroutine f_lsode(neq, time, conc, conc_dot)
   conc_dot(22) = r_rate(30) * conc(21) ! Here r_rate(30) is not multiplied by concentration beforehand.
 
   ! 23 = Alpha-pinene
-  conc_dot(23) = 0.0d0 ! Remember to change in the full model
+  conc_dot(23) = r_rate(31) - r_rate(33) - r_rate(34) 
 
   !24 = HNO3_P
   conc_dot(24) = r_rate(30) * conc(17) ! Here r_rate(30) is not multiplied by concentration beforehand.
