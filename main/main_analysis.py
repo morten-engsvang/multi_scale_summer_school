@@ -151,4 +151,8 @@ title = "H2SO4 (" + str(np.min(h2so4)) + ", " + str(np.max(h2so4)) + ")"
 PlotHeatMapNorm2(hh, time, h2so4, "time [days]", "height [m]", 0, 3.5*10**(7), title)
 title = "ELVOC (" + str(np.min(elvoc)) + ", " + str(np.max(elvoc)) + ")"
 PlotHeatMapNorm2(hh, time, elvoc, "time [days]", "height [m]", 0, 1.05*10**(7), title)
+title = "ALPHA (" + str(np.min(alpha_pinene)) + ", " + str(np.max(alpha_pinene)) + ")"
+PlotHeatMapNorm2(hh, time, alpha_pinene, "time [days]", "height [m]", 0, 2.4*10**(9), title)
+title = "ISOPRENE (" + str(np.min(isoprene)) + ", " + str(np.max(isoprene)) + ")"
+PlotHeatMapNorm2(hh, time, isoprene, "time [days]", "height [m]", 0, 1.6*10**(9), title)
 #print(np.max(oh_radical),np.max(ho2_radical),np.max(h2so4),np.max(elvoc))
