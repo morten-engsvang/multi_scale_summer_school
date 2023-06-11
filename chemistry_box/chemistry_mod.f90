@@ -162,7 +162,7 @@ subroutine f_lsode(neq, time, conc, conc_dot)
   r_rate(32) = k_rate(32)                                                                                         ! Emission rate of isoprene
   r_rate(33) = k_rate(33) * conc(3) * conc(23)                                                                    ! OH + Alpha-pinene = Rest
   r_rate(34) = k_rate(34) * conc(1) * conc(23)                                                                    ! O3 + Alpha-pinene = Rest
-  r_rate(35) = k_rate(35) * conc(13)                                                                              ! isoprene + O3
+  r_rate(35) = k_rate(35) * conc(13) * conc(1)                                                                             ! isoprene + O3
   r_rate(36) = 0.05_dp * k_rate(33) * conc(3) * conc(23) + 0.10 * k_rate(34) * conc(1) * conc(23) - k_rate(36) * conc(25) ! ELVOC = ELVOC_P
   ! Additional ELVOC reactions:
   ! ELVOC = 0.05*k(33)*OH*alpha + 0.10*k(34)*O3*alpha - k*
