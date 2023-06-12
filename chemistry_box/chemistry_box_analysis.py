@@ -55,4 +55,4 @@ species = ["O3",
     
 conc = tools.ReadGeneralData("output/concentrations.dat")
 time = tools.ReadGeneralData("output/time.dat")
-PlotConcentrations(time, conc, "time [days]", "concentration [molecules*cm$^-3$*s$^-1$]", species)
+PlotConcentrations(time, conc, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", species)

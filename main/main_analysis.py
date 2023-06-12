@@ -12,7 +12,7 @@ plt.rcParams.update({'font.size': 12})
 plt.rc("axes", axisbelow = True) #Makes sure gridlines are drawn behind the markers
 
 
-def Plot(hh,data,xlabel,ylabel,day):
+def Plot(hh,data,xlabel,ylabel,day,title):
     fig, axis = plt.subplots()
     colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
     custom_cycler = cycler(color=colors)
@@ -36,7 +36,7 @@ def Plot(hh,data,xlabel,ylabel,day):
         plt.plot(data[108,:],np.transpose(hh), label = "Time: day 5, hr 12")
         plt.plot(data[112,:],np.transpose(hh), label = "Time: day 5, hr 16")
         plt.plot(data[116,:],np.transpose(hh), label = "Time: day 5, hr 20")
-    
+    plt.title(title)
     plt.legend()
     #plt.savefig("three_body.pdf", format="pdf", bbox_inches="tight")
 
@@ -54,7 +54,7 @@ def PlotEmissions(time,data1,data2,xlabel,ylabel,labels):
     plt.legend(loc="lower right")
     #plt.savefig("test.pdf")
 
-def PlotHeatMap(hh,time,data,xlabel,ylabel):
+def PlotHeatMap(hh,time,data,xlabel,ylabel,title):
     fig, axis = plt.subplots()
     axis.set_xlabel(xlabel)
     axis.set_ylabel(ylabel)
@@ -67,8 +67,9 @@ def PlotHeatMap(hh,time,data,xlabel,ylabel):
         i += 1
     plt.pcolormesh(time[:,0],height,np.transpose(data),vmax=175,vmin=-1)
     plt.colorbar()
+    plt.title(title)
     
-def PlotHeatMapNorm(hh,time,data,xlabel,ylabel):
+def PlotHeatMapNorm(hh,time,data,xlabel,ylabel,title):
     fig, axis = plt.subplots()
     axis.set_xlabel(xlabel)
     axis.set_ylabel(ylabel)
@@ -82,6 +83,7 @@ def PlotHeatMapNorm(hh,time,data,xlabel,ylabel):
     
     plt.pcolormesh(time[:,0],height,np.transpose(data),norm=plc.PowerNorm(vmin=-1,vmax=300,gamma=0.5))
     plt.colorbar(ticks=[-1,0,5,50,100,200,300])
+    plt.title(title)
     
 def PlotHeatMapNorm2(hh,time,data,xlabel,ylabel,mini,maxi,title):
     fig, axis = plt.subplots()
@@ -125,24 +127,24 @@ ho2_radical = tools.ReadGeneralData("output/ho2_radical.dat")
 h2so4 = tools.ReadGeneralData("output/h2so4.dat")
 elvoc = tools.ReadGeneralData("output/elvoc.dat")
 
-Plot(hh,uwind,"Wind speed [m/s]","Height [m]",1)
-Plot(hh,uwind,"Wind speed [m/s]","Height [m]",5)
-Plot(hh,vwind,"Wind speed [m/s]","Height [m]",1)
-Plot(hh,vwind,"Wind speed [m/s]","Height [m]",5)
-Plot(hh,theta,"Potential Temperature [K]","Height [m]",1)
-Plot(hh,theta,"Potential Temperature [K]","Height [m]",5)
-PlotHeatMap(hh,time,K_m,"Time [days]","Height [m]")
-PlotHeatMap(hh,time,K_h,"Time [days]","Height [m]")
-PlotHeatMap(hh,time,richard,"Time [days]","Height [m]")
-PlotHeatMapNorm(hh,time,richard,"Time [days]","Height [m]")
+Plot(hh,uwind,"Wind speed [m/s]","Height [m]",1,"U-wind")
+Plot(hh,uwind,"Wind speed [m/s]","Height [m]",5,"U-wind")
+Plot(hh,vwind,"Wind speed [m/s]","Height [m]",1,"V-wind")
+Plot(hh,vwind,"Wind speed [m/s]","Height [m]",5,"V-wind")
+Plot(hh,theta,"Potential Temperature [K]","Height [m]",1,"Potential Temperature")
+Plot(hh,theta,"Potential Temperature [K]","Height [m]",5,"Potential Temperature")
+PlotHeatMap(hh,time,K_m,"Time [days]","Height [m]","K_m")
+PlotHeatMap(hh,time,K_h,"Time [days]","Height [m]","K_h")
+PlotHeatMap(hh,time,richard,"Time [days]","Height [m]","Ri")
+PlotHeatMapNorm(hh,time,richard,"Time [days]","Height [m]","Ri")
 labels = ["isoprene","monoterpene"]
-PlotEmissions(time, emission_isoprene, emission_monoterpene, "Time [days]", "Emission Rate [molec * cm$^{-3}$ * s$^{-1}$]",labels)
-PlotConcentrations(time, alpha_pinene, "time [days]", "concentration [molecules*cm$^{-3}$*s${^-1}$]", "alpha-pinene")
-PlotConcentrations(time, isoprene, "time [days]", "concentration [molecules*cm${^-3}$*s$^{-1}$]", "isoprene")
-PlotConcentrations(time, oh_radical, "time [days]", "concentration [molecules*cm$^{-3}$*s$^{-1}$]", "OH")
-PlotConcentrations(time, ho2_radical, "time [days]", "concentration [molecules*cm$^{-3}$*s$^{-1}$]", "HO2")
-PlotConcentrations(time, h2so4, "time [days]", "concentration [molecules*cm$^{-3}$*s$^{-1}$]", "H2SO4")
-PlotConcentrations(time, elvoc, "time [days]", "concentration [molecules*cm$^{-3}$*s$^{-1}$]", "ELVOC")
+PlotEmissions(time, emission_isoprene, emission_monoterpene, "Time [days]", "Emission Rate [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]",labels)
+PlotConcentrations(time, alpha_pinene, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "alpha-pinene")
+PlotConcentrations(time, isoprene, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "isoprene")
+PlotConcentrations(time, oh_radical, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "OH")
+PlotConcentrations(time, ho2_radical, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "HO2")
+PlotConcentrations(time, h2so4, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "H2SO4")
+PlotConcentrations(time, elvoc, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "ELVOC")
 title = "OH (" + str(np.min(oh_radical)) + ", " + str(np.max(oh_radical)) + ")"
 PlotHeatMapNorm2(hh, time, oh_radical, "time [days]", "height [m]", 0, 2*10**(6), title)
 title = "HO2 (" + str(np.min(ho2_radical)) + ", " + str(np.max(ho2_radical)) + ")"
