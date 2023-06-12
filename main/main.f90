@@ -387,12 +387,12 @@ subroutine write_files(time)
   write(16, outfmt_level     ) emission_isoprene
   write(17, outfmt_level     ) emission_monoterpene
 
-  write(18,outfmt_level) concentration(:,23)
-  write(19,outfmt_level) concentration(:,13)
-  write(20,outfmt_level) concentration(:,3)
-  write(21,outfmt_level) concentration(:,8)
-  write(22,outfmt_level) concentration(:,21)
-  write(23,outfmt_level) concentration(:,25)
+  write(18,outfmt_level) concentration(:,23) ! Alpha pinene concentrations
+  write(19,outfmt_level) concentration(:,13) ! Isoprene concentrations
+  write(20,outfmt_level) concentration(:,3) ! OH concentrations
+  write(21,outfmt_level) concentration(:,8) ! HO2 concentrations
+  write(22,outfmt_level) concentration(:,21) ! H2SO4 concentrations
+  write(23,outfmt_level) concentration(:,25) ! ELVOC concentrations
 
 end subroutine write_files
 
@@ -431,7 +431,7 @@ subroutine time_init()
   ! Basic time variables
   time_start = 0.0d0
   time_end   = 5.0d0 * 24.0d0 * one_hour
-  !time_end   = 4.0d0 * 24.0d0 * one_hour
+  !time_end   = 14.0d0 * 24.0d0 * one_hour
   time       = time_start
 
   ! Time steps
