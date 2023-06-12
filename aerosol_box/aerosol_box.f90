@@ -42,6 +42,8 @@ end if
      
 PN=sum(particle_conc)*1D-6                 ! [# cm-3], total particle number concentration
 PM=sum(particle_conc*particle_mass)*1D9    ! [ug m-3], total particle mass concentration
+PV=sum(particle_conc*particle_volume)*1D12 ! [um^3 cm^-3] Total particle volume
+! Calculated by multiplying the mass with the particle density in kg/m^-3 and a unit conversion factor.
     
 simu_hours = 24D0
 timestep   = 10.0d0
@@ -54,11 +56,13 @@ open(101,file=trim(adjustl(output_dir))//'/particle_conc.dat',status='replace',a
 open(102,file=trim(adjustl(output_dir))//'/PN.dat',status='replace',action='write')
 open(103,file=trim(adjustl(output_dir))//'/PM.dat',status='replace',action='write')
 open(104,file=trim(adjustl(output_dir))//'/time.dat',status='replace',action='write')
+open(105,file=trim(adjustl(output_dir))//'/PV.dat',status='replace',action='write')
 write(100,*) diameter
 write(101,*) particle_conc
 write(102,*) PN
 write(103,*) PM
 write(104,*) time/one_day
+write(105,*) PV
 
 do while (time < time_end) ! Main program time step loop
 
@@ -85,6 +89,7 @@ do while (time < time_end) ! Main program time step loop
   
   if (use_nucleation) then
   !!! Calculate new particle formation (nucleation) here !!!
+    call nucleation(nucleation_coef,cond_vapour(1),particle_conc,timestep)
   end if
   
   if (use_coagulation) then
@@ -96,7 +101,10 @@ do while (time < time_end) ! Main program time step loop
   end if
 
   !!! Update PN and PM here !!!
-  
+  PN=sum(particle_conc)*1D-6                 ! [# cm-3], total particle number concentration
+  PM=sum(particle_conc*particle_mass)*1D9    ! [ug m-3], total particle mass concentration
+  PV=sum(particle_conc*particle_volume)*1D12 ! [um^3 cm^-3] Total particle volume
+
   time = time + timestep
   
   if (modulo(FLOOR(1000*time), nint(1000*one_hour)) == 0) then
@@ -105,6 +113,7 @@ do while (time < time_end) ! Main program time step loop
     write(102,*) PN
     write(103,*) PM
     write(104,*) time/one_day
+    write(105,*) PV
   end if
 end do
 
@@ -113,5 +122,6 @@ close(101)
 close(102)
 close(103)
 close(104)
+close(105)
 
 END PROGRAM aerosol_box

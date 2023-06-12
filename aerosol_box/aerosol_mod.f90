@@ -8,7 +8,7 @@ PUBLIC :: pi
 PUBLIC :: dp, cond_vapour, diameter, particle_mass, particle_volume, particle_conc, &
           particle_density, nucleation_coef, molecular_mass, molar_mass, &
           molecular_volume, molecular_dia, mass_accomm, &
-          PN, PM
+          PN, PM, PV
 PUBLIC :: aerosol_init, nucleation, condensation, coagulation, dry_dep_velocity
 
 !====================== Definition of variables =====================================================================!
@@ -42,7 +42,7 @@ REAL(dp), DIMENSION(nr_cond) :: molecular_mass  , &  ! molecular mass of the con
                                       
 REAL(dp), DIMENSION(nr_cond) :: cond_sink = 1.0d-3  ! Assumed initial condensation sink of vapours [s^-1]
 
-REAL(dp) :: PN, PM  ! Total particle number [# m-3] and mass concentration [kg m-3]
+REAL(dp) :: PN, PM, PV  ! Total particle number [# m-3] and mass concentration [kg m-3], particle volume [um^3 cm^-3]
      
 REAL(dp) :: vd_SO2, vd_O3, vd_HNO3  ! [m s-1], dry deposition velocity of SO2, O3 & HNO3     
 
@@ -111,10 +111,17 @@ SUBROUTINE aerosol_init(diameter, particle_mass, particle_volume, particle_conc,
 
 END SUBROUTINE aerosol_init
   
-SUBROUTINE nucleation ! (Add input and output variables here)
-  
+SUBROUTINE nucleation(nucleation_coef,conc_h2so4,particle_conc,dt_aerosol) ! (Add input and output variables here)
+  REAL(dp) :: nucleation_coef  ! [m3 molec-1], nucleation coefficient
+  REAL(dp), DIMENSION(nr_bins) :: particle_conc ! [# m-3], number concentration
+  REAL(dp) :: conc_h2so4 ! [molecules/cm^3] Concentration of sulphuric acid.
+  REAL(dp) :: J_2nm ! [molecules^-3 * s^-1] formation rate of 2 nm aerosol particles
+  REAL(dp) :: dt_aerosol ! [s] Time step size
   ! Consider how kinetic H2SO4 nucleation influence the number concentrations of particles 
   ! in the fist size bin particle_conc(1) within one model time step
+  J_2nm = nucleation_coef * conc_h2so4**2
+  where((abs(diameter-2D-9)-MINVAL(abs(diameter-2D-9)))<1D-20) particle_conc = particle_conc + J_2nm*dt_aerosol ! Update the 2 nm size bin
+  ! This code above is stolen from the initialization code, not sure exactly how this works.
 
 END SUBROUTINE nucleation
 
