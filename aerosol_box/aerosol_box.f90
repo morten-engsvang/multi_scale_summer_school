@@ -98,6 +98,9 @@ do while (time < time_end) ! Main program time step loop
   
   if (use_condensation) then
   !!! Calculate condensation particle growth here !!!
+    call condensation(timestep, temperature, pressure, mass_accomm, molecular_mass, &
+    molecular_volume, molar_mass, molecular_dia, particle_mass, particle_volume, &
+    particle_conc, diameter, cond_vapour)
   end if
 
   !!! Update PN and PM here !!!

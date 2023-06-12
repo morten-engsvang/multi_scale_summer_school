@@ -146,8 +146,20 @@ SUBROUTINE condensation(timestep, temperature, pressure, mass_accomm, molecular_
   REAL(dp), DIMENSION(nr_cond) :: diffusivity_gas, speed_gas
   
   REAL(dp) :: dyn_visc, l_gas, dens_air
+
+  REAL(dp), DIMENSION(nr_cond) :: fuchs_beta ! Fuchs Sutugin correction for the different vapours
+
+  REAL(dp), DIMENSION(nr_cond) :: knudsen ! Knudsen number for the different vapours
+
+  REAL(dp), DIMENSION(nr_cond) :: CR ! Collision rates for the different vapours
+
+  REAL(dp), DIMENSION(nr_cond) :: lambda ! Mean free path of the vapours
+
+  REAL(dp), DIMENSION(nr_bins) :: particle_volume_new = 0.0_dp ! Vector to store the increase in particle volume
+
+  REAL(dp) :: x_1, x_2 ! Variables to store fractions for the full-stationary structure method
   
-  INTEGER :: j
+  INTEGER :: j, i
   
   ! Add more variabels as you need it...
   
@@ -167,19 +179,39 @@ SUBROUTINE condensation(timestep, temperature, pressure, mass_accomm, molecular_
   ! Thermal velocity of vapour molecule
   speed_gas=SQRT(8D0*kb*temperature/(pi*molecular_mass)) ! speed of H2SO4 molecule
   
-  ! Calculate the Fuchs-Sutugin correction factor: 
+  ! For all the particle diameters:
+  do j = 1, nr_bins
+    do i = 1, nr_cond
+      ! Calculate the Fuchs-Sutugin correction factor:
+      ! First the mean free path
+      lambda(i) = 3 * (diffusivity_gas(i) + diffusivity(j)) / (sqrt(speed_gas(i)**2 + speed_p(j)**2))
+      ! Then Knudsen for the condensable vapour
+      knudsen(i) = 2 * lambda(i) / (diameter(j) + molecular_dia(i))
+      ! Then Fuchs correction
+      fuchs_beta(i) = (0.75_dp * mass_accomm * (1 + knudsen(i)))&
+      / (knudsen(i)**2 + knudsen(i) + 0.283_dp * knudsen(i) * mass_accomm + 0.75_dp * mass_accomm)
+      ! Calculate the Collision rate (CR [m^3/2]) between gas molecules (H2SO4 and ELVOC) and the particles:
+      CR(i) = 2 * pi * (diameter(j) + molecular_dia(i)) * (diffusivity(j) + diffusivity_gas(i)) * fuchs_beta(i)
+    end do
+    ! Calculate the new single particle volume after condensation (particle_volume_new):
+    particle_volume_new(j) = particle_volume(j)&
+    + timestep * CR(1) * cond_vapour(1) * molecular_volume(1)&
+    + timestep * CR(2) * cond_vapour(2) * molecular_volume(2)
+  end do
   
-  ! Calculate the Collision rate (CR [m^3/2]) between gas molecules (H2SO4 and ELVOC) and the particles:
-  
-  ! Calculate the new single particle volume after condensation (particle_volume_new):
   
   ! Use the full-stationary method to divide the particles between the existing size bins (fixed diameter grid):
   particle_conc_new=0D0 ! Initialise a new vector with the new particle concentrations
-  particle_conc_new(nr_bins)=particle_conc(nr_bins)
+  particle_conc_new(nr_bins)=particle_conc(nr_bins) ! To ensure that they don't grow out of the box ,
+  ! Otherwise we're not going to preserve the number of particles
   
   DO j = 1,nr_bins-1
   ! Add equations that redistributes the particle number concentration 
-  !in size bin 1 to nr_bins-1 to the fixed volume (diameter) grid    
+  ! in size bin 1 to nr_bins-1 to the fixed volume (diameter) grid 
+    x_1 = (particle_volume(j+1) - particle_volume_new(j)) / (particle_volume(j+1) - particle_volume(j)) ! Fraction to leave in bin j
+    x_2 = 1.0_dp - x_1 ! fraction to pass onto bin j+1
+    particle_conc_new(j) = particle_conc_new(j) + x_1 * particle_conc(j)
+    particle_conc_new(j + 1) = particle_conc_new(j + 1) + x_2 * particle_conc(j) 
   END DO
   ! Update the particle concentration in the particle_conc vector:
   particle_conc=particle_conc_new
