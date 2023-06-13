@@ -65,7 +65,17 @@ def PlotHeatMap(hh,time,data,xlabel,ylabel,title):
         #print(half_height)
         height[i] = half_height
         i += 1
-    plt.pcolormesh(time[:,0],height,np.transpose(data),vmax=175,vmin=-1)
+    plt.pcolormesh(time[:,0],height,np.transpose(data),vmax=175,vmin=-1,cmap="jet")
+    plt.colorbar()
+    plt.title(title)
+    
+def PlotHeatMap2(diameter,time,data,xlabel,ylabel,title):
+    fig, axis = plt.subplots()
+    axis.set_xlabel(xlabel)
+    axis.set_ylabel(ylabel)
+    axis.set_yscale('log')
+    axis.set_xlim([3,5])
+    plt.pcolormesh(time[:,0],diameter[0,:],np.log10(np.transpose(data)*10**(-6)),vmax=3.2,vmin=0,cmap="jet")
     plt.colorbar()
     plt.title(title)
     
@@ -81,7 +91,7 @@ def PlotHeatMapNorm(hh,time,data,xlabel,ylabel,title):
         height[i] = half_height
         i += 1
     
-    plt.pcolormesh(time[:,0],height,np.transpose(data),norm=plc.PowerNorm(vmin=-1,vmax=300,gamma=0.5))
+    plt.pcolormesh(time[:,0],height,np.transpose(data),norm=plc.PowerNorm(vmin=-1,vmax=300,gamma=0.5),cmap="jet")
     plt.colorbar(ticks=[-1,0,5,50,100,200,300])
     plt.title(title)
     
@@ -89,7 +99,7 @@ def PlotHeatMapNorm2(hh,time,data,xlabel,ylabel,mini,maxi,title):
     fig, axis = plt.subplots()
     axis.set_xlabel(xlabel)
     axis.set_ylabel(ylabel)
-    plt.pcolormesh(time[:,0],hh[0,:],np.transpose(data),norm=plc.PowerNorm(vmin=mini,vmax=maxi,gamma=0.3))
+    plt.pcolormesh(time[:,0],hh[0,:],np.transpose(data),norm=plc.PowerNorm(vmin=mini,vmax=maxi,gamma=0.3),cmap="jet")
     plt.colorbar()
     plt.title(title)
     axis.set_xlim([3,5])
@@ -107,6 +117,36 @@ def PlotConcentrations(time,data,xlabel,ylabel,species):
     plt.title(species)
     plt.legend()
 
+def PlotConcDistr(diameter,data1,data2,data3,xlabel,ylabel,title):
+    fig, axis = plt.subplots()
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
+    custom_cycler = cycler(color=colors)
+    axis.set_prop_cycle(custom_cycler)
+    axis.set_xlabel(xlabel)
+    axis.set_ylabel(ylabel)
+    axis.set_xscale('log')
+    axis.set_yscale('log')
+    plt.plot(diameter[0,:]*10**(9), data1[120,:]*10**(-6), label="Only nuc")
+    plt.plot(diameter[0,:]*10**(9), data2[120,:]*10**(-6), label="Nuc+Cond")
+    plt.plot(diameter[0,:]*10**(9), data3[120,:]*10**(-6), label="Nuc+Cond+Coag")
+    axis.set_xlim([1,10**3])
+    axis.set_ylim([1,10**6])
+    plt.grid(visible=True,which="both")
+    plt.legend()
+    plt.title(title)
+
+def PlotTimeSeries(time,data,data2,xlabel,ylabel,title):
+    fig, axis = plt.subplots()
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
+    custom_cycler = cycler(color=colors)
+    axis.set_prop_cycle(custom_cycler)
+    axis.set_xlabel(xlabel)
+    axis.set_ylabel(ylabel)
+    plt.plot(time[:,0],data[:,1], label = "Nuc+Cond+Coag")
+    plt.plot(time[:,0],data2[:,1], label = "Nuc+Cond")
+    axis.set_xlim([3,5])
+    plt.title(title)
+    plt.legend()
 
 hh = tools.ReadGeneralData("output/hh.dat")
 uwind = tools.ReadGeneralData("output/uwind.dat")
@@ -116,6 +156,16 @@ K_m = tools.ReadGeneralData("output/K_m.dat")
 K_h = tools.ReadGeneralData("output/K_h.dat")
 richard = tools.ReadGeneralData("output/richard.dat")
 time = tools.ReadGeneralData("output/time.dat")
+diameter = tools.ReadGeneralData("output/diameter.dat")
+aero_conc_nuc = tools.ReadGeneralData("old_data/nuc/aerosol_conc_1.dat")
+aero_conc_nuc_cond = tools.ReadGeneralData("old_data/nuc_cond/aerosol_conc_1.dat")
+aero_conc = tools.ReadGeneralData("output/aerosol_conc_1.dat")
+
+PN_nuc_cond = tools.ReadGeneralData("old_data/nuc_cond/PN.dat")
+PN = tools.ReadGeneralData("output/PN.dat")
+
+PM_nuc_cond = tools.ReadGeneralData("old_data/nuc_cond/PM.dat")
+PM = tools.ReadGeneralData("output/PM.dat")
 
 emission_isoprene = tools.ReadGeneralData("output/emission_isoprene.dat")
 emission_monoterpene = tools.ReadGeneralData("output/emission_monoterpene.dat")
@@ -157,4 +207,9 @@ title = "ALPHA (" + str(np.min(alpha_pinene)) + ", " + str(np.max(alpha_pinene))
 PlotHeatMapNorm2(hh, time, alpha_pinene, "time [days]", "height [m]", 0, 2.4*10**(9), title)
 title = "ISOPRENE (" + str(np.min(isoprene)) + ", " + str(np.max(isoprene)) + ")"
 PlotHeatMapNorm2(hh, time, isoprene, "time [days]", "height [m]", 0, 1.6*10**(9), title)
-#print(np.max(oh_radical),np.max(ho2_radical),np.max(h2so4),np.max(elvoc))
+
+
+PlotConcDistr(diameter,aero_conc_nuc,aero_conc_nuc_cond,aero_conc,"Diameter [nm]","N [cm$^{-3}$]","Particle Size Distribution for the first layer after simulation")
+PlotTimeSeries(time, PN, PN_nuc_cond, "Time [days]", "Total PN [cm$^{-3}$]", "PN in the first model layer")
+PlotTimeSeries(time, PM, PM_nuc_cond, "Time [days]", "Total PN [$\mu$g cm$^{-3}$]", "PM in the first model layer")
+PlotHeatMap2(diameter,time,aero_conc,"Time [days]","PN [log$_{10}$(cm$^{-3}$)","title")

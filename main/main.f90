@@ -14,6 +14,7 @@
 program main
 
 use chemistry_mod
+use aerosol_mod
 
 implicit none
 
@@ -22,6 +23,7 @@ implicit none
 !-----------------------------------------------------------------------------------------
 logical :: use_emission   = .true.
 logical :: use_chemistry  = .true.
+!logical :: use_chemistry  = .false.
 logical :: use_deposition = .false.
 logical :: use_aerosol    = .true.
 integer, parameter :: model_number = 3 ! Which K-model to use.
@@ -133,6 +135,18 @@ real(dp), dimension(nz) :: N2 ! [molecules/cm3] Nitrogen concentration at each l
 real(dp), dimension(nz) :: H2O ! [molecules/cm3] Water concentration at each level
 real(dp), dimension(nz,neq) :: concentration ! [molecules/cm3] Chemical species concentrations (row) for each level (column)
 
+! Aerosol vectors and matrixes:
+integer, parameter :: nr_bins = 100 ! Number of particle sizes used in the aerosol code
+integer, parameter :: nr_cond = 2 ! Number of condensable vapours.
+real(dp), dimension(nz) :: PN,& ! [# m^-3] Total number concentration for each height level
+                           PM,& ! [kg m^-3] Total mass concentration for each height level
+                           PV ! [um^3 cm^-3] Total volume concentration for each height level
+real(dp), dimension(nz,nr_bins) :: aerosol_conc ! Aerosol concentrations
+! where columns denote the height level and rows denote the size bins.
+real(dp), dimension(nr_cond) :: cond_vapour ! [molec/m^3] Vector of concentrations of condensable vapours
+real(dp), dimension(nz) :: daero_dt ! Derivative of aerosol with regards to time 
+real(dp), dimension(nz,nr_cond) :: cond_sink ! Condensation sink for each height level for H2SO4 and ELVOC
+
 integer :: i, j  ! used for loops
 
 
@@ -143,6 +157,20 @@ integer :: i, j  ! used for loops
 call time_init()                 ! initialize time
 call meteorology_init()          ! initialize meteorology
 call chemistry_init()            ! initialize chemistry
+do i = 1, nz
+  call aerosol_init(diameter, particle_mass, particle_volume, aerosol_conc(i,:), &
+  particle_density, nucleation_coef, molecular_mass, molar_mass, &
+  molecular_volume, molecular_dia, mass_accomm) ! initialize aerosol variables and values
+end do
+
+cond_sink = 0.001d0
+
+! Calculate initial values of PN, PM, PV
+do i = 1, nz
+  PN(i) = sum(aerosol_conc(i,:)) * 1D-6                 ! [# cm-3], total particle number concentration
+  PM(i) = sum(aerosol_conc(i,:)*particle_mass) * 1D9    ! [ug m-3], total particle mass concentration
+  PV(i) = sum(aerosol_conc(i,:)*particle_volume) * 1D12 ! [um^3 cm^-3] Total particle volume
+end do
 
 call open_files()        ! open output files
 call write_files(time)   ! write initial values
@@ -151,6 +179,7 @@ call write_files(time)   ! write initial values
 ! Start main loop
 !-----------------------------------------------------------------------------------------
 do while (time <= time_end)
+  !write(*,*) cond_sink
   ! Passage of time:
   !days = aint(time / (24*60*60)) ! truncates time / 24 to the integer, i.e. only increments from 0 when 24 hours passes
   !daynumber = daynumber_start + days ! increases the day number if 24 hours passes.
@@ -223,7 +252,7 @@ do while (time <= time_end)
   if ( use_chemistry .and. time >= time_start_chemistry ) then
     if ( mod( nint((time - time_start_chemistry)*1000.0d0), nint(dt_chem*1000.0d0) ) == 0 ) then
       ! Solve chemical equations for each layer except boundaries
-      call chemistry_1D(time,theta,Mair,O2,N2,H2O,concentration,dt_chem,emission_isoprene,emission_monoterpene)
+      call chemistry_1D(time,theta,Mair,O2,N2,H2O,concentration,dt_chem,emission_isoprene,emission_monoterpene,cond_sink)
     end if  ! every dt_chem
   end if
 
@@ -251,7 +280,6 @@ do while (time <= time_end)
       end do
       do j = 2, nz-1
         concentration(j,i) = concentration(j,i) + dt*dc_dt(j)
-        !write(*,*) dt*dc_dt(j)
       end do
     end do
 
@@ -271,18 +299,51 @@ do while (time <= time_end)
   if ( use_aerosol .and. time >= time_start_aerosol ) then
     if ( mod( nint((time - time_start_aerosol)*1000.0d0), nint(dt_aero*1000.0d0) ) == 0 ) then
       ! Nucleation, condensation, coagulation and deposition of particles
+      ! Make sure temperature and pressure is updated:
+      temp = theta - (grav/Cp)*hh
+      pres = barometric_law(p00, temp, hh)
+      ! First reset the condensation sink
+      cond_sink = 0.001d0
+      do i = 2, nz-1
+        ! Find the concentrations of the condensable vapours:
+        cond_vapour(1) = concentration(i,21) * 1d6
+        cond_vapour(2) = concentration(i,25) * 1d6
+        call nucleation(nucleation_coef,cond_vapour(1),aerosol_conc(i,:),dt_aero)
+        call condensation(dt_aero, temp(i), pres(i), mass_accomm, molecular_mass, &
+        molecular_volume, molar_mass, molecular_dia, particle_mass, particle_volume, &
+        aerosol_conc(i,:), diameter, cond_vapour, cond_sink(i,:))
+        call coagulation(dt_aero, aerosol_conc(i,:), diameter, temp(i), pres(i), particle_mass)
+      end do
     end if
 
     ! Trick to make bottom flux zero
-
+    aerosol_conc(1,:) = aerosol_conc(2,:)
     ! Concentrations can not be lower than 0 [molec m-3]
-
+    aerosol_conc(:,:) = max(aerosol_conc(:,:),0.0_dp)
     ! Mixing of aerosol particles
-
+    do i = 1, nr_bins
+      ! Quickly initialize the concentration change vector for the new chemical:
+      daero_dt = 0.0_dp
+      do j = 2, nz-1
+        daero_dt(j) = (K_h_half(j) * ((aerosol_conc(j+1,i) - aerosol_conc(j,i)) / (hh(j + 1) - hh(j))) - & 
+        K_h_half(j - 1) * ((aerosol_conc(j,i) - aerosol_conc(j-1,i)) / (hh(j) - hh(j - 1)))) / ((hh(j + 1) - hh(j - 1)) / 2.0_dp)
+      end do
+      do j = 2, nz-1
+        aerosol_conc(j,i) = aerosol_conc(j,i) + dt*daero_dt(j)
+      end do
+    end do
+    ! Set the top to be zero to simulate aerosols leaving the box:
+    !aerosol_conc(nz,:) = 0.0_dp
     ! Set the constraints above again for output
-
+    aerosol_conc(1,:) = aerosol_conc(2,:)
+    aerosol_conc(:,:) = max(aerosol_conc(:,:),0.0_dp)
     ! Update related values, e.g., total number concentration, total mass concentration
 
+    do i = 1, nz
+      PN(i) = sum(aerosol_conc(i,:)) * 1D-6                 ! [# cm-3], total particle number concentration
+      PM(i) = sum(aerosol_conc(i,:)*particle_mass) * 1D9    ! [ug m-3], total particle mass concentration
+      PV(i) = sum(aerosol_conc(i,:)*particle_volume) * 1D12 ! [um^3 cm^-3] Total particle volume
+    end do
   end if
 
   !---------------------------------------------------------------------------------------
@@ -351,6 +412,12 @@ subroutine open_files()
   open(22,file=trim(adjustl(output_dir))//'/h2so4.dat',status='replace',action='write')
   open(23,file=trim(adjustl(output_dir))//'/elvoc.dat',status='replace',action='write')
 
+  open(24,file=trim(adjustl(output_dir))//'/PN.dat',status='replace',action='write')
+  open(25,file=trim(adjustl(output_dir))//'/PM.dat',status='replace',action='write')
+  open(26,file=trim(adjustl(output_dir))//'/PV.dat',status='replace',action='write')
+
+  open(27,file=trim(adjustl(output_dir))//'/aerosol_conc_1.dat',status='replace',action='write')
+  open(28,file=trim(adjustl(output_dir))//'/diameter.dat',status='replace',action='write')
 end subroutine open_files
 
 
@@ -361,13 +428,14 @@ end subroutine open_files
 !-----------------------------------------------------------------------------------------
 subroutine write_files(time)
   real(dp) :: time  ! current time
-  character(255) :: outfmt_one_scalar, outfmt_two_scalar, outfmt_level, outfmt_mid_level
+  character(255) :: outfmt_one_scalar, outfmt_two_scalar, outfmt_level, outfmt_mid_level, outfmt_size_bins
 
   ! Output real data with scientific notation with 16 decimal digits
   outfmt_one_scalar = '(es25.16e3)'                               ! for scalar
   write(outfmt_level     , '(a, i3, a)') '(', nz  , 'es25.16e3)'  ! for original levels
   write(outfmt_mid_level , '(a, i3, a)') '(', nz-1, 'es25.16e3)'  ! for middle levels
   write(outfmt_two_scalar, '(a, i3, a)') '(', 2   , 'es25.16e3)'  ! for two scalars
+  write(outfmt_size_bins, '(a, i3, a)') '(', nr_bins , 'es25.16e3)' ! For size distributions
 
   ! Only output hh once
   if (time == time_start) then
@@ -394,6 +462,12 @@ subroutine write_files(time)
   write(22,outfmt_level) concentration(:,21) ! H2SO4 concentrations
   write(23,outfmt_level) concentration(:,25) ! ELVOC concentrations
 
+  write(24, outfmt_level) PN
+  write(25, outfmt_level) PM
+  write(26, outfmt_level) PV
+
+  write(27, outfmt_size_bins) aerosol_conc(1,:) ! Aerosol number concentration in the 1st model layer
+  write(28, outfmt_size_bins) diameter ! Diameters corresponding to the size bins.
 end subroutine write_files
 
 
@@ -419,6 +493,12 @@ subroutine close_files()
   close(21)
   close(22)
   close(23)
+  close(24)
+  close(25)
+  close(26)
+  close(27)
+  close(27)
+  close(28)
 end subroutine close_files
 
 
@@ -431,7 +511,7 @@ subroutine time_init()
   ! Basic time variables
   time_start = 0.0d0
   time_end   = 5.0d0 * 24.0d0 * one_hour
-  !time_end   = 14.0d0 * 24.0d0 * one_hour
+  !time_end   = 4.0d0 * 24.0d0 * one_hour
   time       = time_start
 
   ! Time steps
@@ -696,7 +776,7 @@ end do
 
 end subroutine wind_derivatives
 
-subroutine chemistry_1D(time,theta,Mair,O2,N2,H2O,concentration,dt_chem,emission_isoprene,emission_monoterpene)
+subroutine chemistry_1D(time,theta,Mair,O2,N2,H2O,concentration,dt_chem,emission_isoprene,emission_monoterpene,cond_sink)
   real(dp) :: time ! [s] Current time since start
   real(dp) :: dt_chem ! [s] Chemistry time step
   real(dp) :: emission_isoprene ! [molecules/cm3/s] Emission rate of isoprene
@@ -711,6 +791,7 @@ subroutine chemistry_1D(time,theta,Mair,O2,N2,H2O,concentration,dt_chem,emission
   real(dp) :: exp_coszen
   real(dp), dimension(nz) :: emi_iso_height_dep ! Height-dependent emission of isoprene
   real(dp), dimension(nz) :: emi_mono_height_dep ! Height-dependent emission of monoterpene
+  real(dp), dimension(nz,nr_cond) :: cond_sink
 
   temp = theta - (grav/Cp)*hh
   !write(*,*) "Temperature at level 2 is:", temp(2)
@@ -752,7 +833,7 @@ subroutine chemistry_1D(time,theta,Mair,O2,N2,H2O,concentration,dt_chem,emission
 
   ! Doing the chemistry for all the heights
   do i = 2, nz-1
-    call chemistry_step(concentration(i,:),time,time+dt_chem,O2(i),N2(i),Mair(i),H2O(i),temp(i),exp_coszen,emi_iso_height_dep(i),emi_mono_height_dep(i))
+    call chemistry_step(concentration(i,:),time,time+dt_chem,O2(i),N2(i),Mair(i),H2O(i),temp(i),exp_coszen,emi_iso_height_dep(i),emi_mono_height_dep(i),cond_sink(i,:))
     !write(*,*) O2(i),N2(i),H2O(i)
   end do
 
