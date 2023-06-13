@@ -46,6 +46,7 @@ PV=sum(particle_conc*particle_volume)*1D12 ! [um^3 cm^-3] Total particle volume
 ! Calculated by multiplying the mass with the particle density in kg/m^-3 and a unit conversion factor.
     
 simu_hours = 24D0
+!simu_hours = 0.542_dp*24D0
 timestep   = 10.0d0
 time_start = 0D0
 time_end   = time_start + simu_hours*one_hour
@@ -94,6 +95,7 @@ do while (time < time_end) ! Main program time step loop
   
   if (use_coagulation) then
   !!! Calculate coagulation losses here !!!
+    call coagulation(timestep, particle_conc, diameter, temperature, pressure, particle_mass)
   end if
   
   if (use_condensation) then

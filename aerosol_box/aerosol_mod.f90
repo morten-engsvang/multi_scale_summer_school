@@ -235,7 +235,10 @@ SUBROUTINE coagulation(timestep, particle_conc, diameter, &
   REAL(dp) :: dyn_visc, &  ! dynamic viscosity, kg/(m*s)
               l_gas        ! Gas mean free path in air
   
-  INTEGER  :: i
+  REAL(dp), DIMENSION(nr_bins) :: loss_self
+  REAL(dp), DIMENSION(nr_bins) :: loss_other
+  
+  INTEGER  :: i,j
   
   ! The coagulation coefficient is calculated according to formula 13.56 in Seinfield and Pandis (2006), Page 603
   
@@ -267,11 +270,29 @@ SUBROUTINE coagulation(timestep, particle_conc, diameter, &
   ! Write equations that considers how the particle number concentration in each size bin 
   !(particle_conc) is influenced by the coagulation sink (loss of smaller particles when
   ! they collide with larger ones)
-  
+
   ! You can first calculate the loss (loss1) do to self-coagulation between particles in the same size bin
   ! and then calculate the loss (loss2) due to coagulation with larger particles
   ! Then add the two loss terms together loss = loss1 + loss2 
-
+  loss_self = 0.0_dp
+  loss_other = 0.0_dp
+  DO i = 1, nr_bins-1
+    ! First the self-coagulation for the i'th particle size
+    ! Except for the largest particles size, which is handled
+    ! separately
+    loss_self(i) = - coagulation_coef(i,i) * particle_conc(i)**2
+    DO j = i + 1, nr_bins
+      ! Then the loss to all the particles larger than the i'th particle size
+      loss_other(i) = loss_other(i) - coagulation_coef(i,j) * particle_conc(i) * particle_conc(j)
+    END DO
+  END DO
+  ! Handling of the largest particle size:
+  loss_self(nr_bins) = - coagulation_coef(nr_bins,nr_bins) * particle_conc(nr_bins)**2
+  loss_other(nr_bins) = 0.0_dp
+  ! Updating the concentrations:
+  DO i = 1, nr_bins
+    particle_conc(i) = particle_conc(i) + timestep * (loss_self(i) + loss_other(i))
+  END DO
 END SUBROUTINE coagulation
 
   
