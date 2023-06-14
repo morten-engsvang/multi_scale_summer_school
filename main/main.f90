@@ -157,6 +157,8 @@ integer :: i, j  ! used for loops
 call time_init()                 ! initialize time
 call meteorology_init()          ! initialize meteorology
 call chemistry_init()            ! initialize chemistry
+! I don't need to do this 50 times sinces the initial aerosol concentrations are identical in each layer
+! So I could have done it once and then copied over aerosol_conc to all the other layers
 do i = 1, nz
   call aerosol_init(diameter, particle_mass, particle_volume, aerosol_conc(i,:), &
   particle_density, nucleation_coef, molecular_mass, molar_mass, &
