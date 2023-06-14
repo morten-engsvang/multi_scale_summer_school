@@ -159,7 +159,7 @@ time = tools.ReadGeneralData("output/time.dat")
 diameter = tools.ReadGeneralData("output/diameter.dat")
 aero_conc_nuc = tools.ReadGeneralData("old_data/nuc/aerosol_conc_1.dat")
 aero_conc_nuc_cond = tools.ReadGeneralData("old_data/nuc_cond/aerosol_conc_1.dat")
-aero_conc = tools.ReadGeneralData("output/aerosol_conc_1.dat")
+aero_conc_nuc_cond_coag = tools.ReadGeneralData("output/aerosol_conc_1.dat")
 
 PN_nuc_cond = tools.ReadGeneralData("old_data/nuc_cond/PN.dat")
 PN = tools.ReadGeneralData("output/PN.dat")
@@ -209,7 +209,7 @@ title = "ISOPRENE (" + str(np.min(isoprene)) + ", " + str(np.max(isoprene)) + ")
 PlotHeatMapNorm2(hh, time, isoprene, "time [days]", "height [m]", 0, 1.6*10**(9), title)
 
 
-PlotConcDistr(diameter,aero_conc_nuc,aero_conc_nuc_cond,aero_conc,"Diameter [nm]","N [cm$^{-3}$]","Particle Size Distribution for the first layer after simulation")
+PlotConcDistr(diameter,aero_conc_nuc,aero_conc_nuc_cond,aero_conc_nuc_cond_coag,"Diameter [nm]","N [cm$^{-3}$]","Particle Size Distribution for the first layer after simulation")
 PlotTimeSeries(time, PN, PN_nuc_cond, "Time [days]", "Total PN [cm$^{-3}$]", "PN in the first model layer")
 PlotTimeSeries(time, PM, PM_nuc_cond, "Time [days]", "Total PN [$\mu$g cm$^{-3}$]", "PM in the first model layer")
-PlotHeatMap2(diameter,time,aero_conc,"Time [days]","PN [log$_{10}$(cm$^{-3}$)","title")
+PlotHeatMap2(diameter,time,aero_conc_nuc_cond_coag,"Time [days]","PN [log$_{10}$(cm$^{-3}$)","title")
