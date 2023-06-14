@@ -72,7 +72,7 @@ do while (time < time_end) ! Main program time step loop
   temperature = 300D0  ! [K]
   pressure = 1D5       ! [Pa]
   
-  Richards_nr10m = 0D0 ! [-], Richardson number at 10 m above ground (0 for neutral atmosphere)
+  Richards_nr10m = 0.0D0 ! [-], Richardson number at 10 m above ground (0 for neutral atmosphere)
   wind_speed10m = 2D0  ! [m s-1], wind speed at the reference altitude 10 m
   mixing_height = 1D3  ! [m], assumed mixing height of the box model
   
@@ -86,6 +86,8 @@ do while (time < time_end) ! Main program time step loop
   
   if (use_aerosol_deposition) then
   !!! Calculate particle dry deposition velocity and particle losses due to dry deposition here !!!
+    call dry_dep_velocity(diameter,particle_density,temperature,pressure,DSWF, & 
+    Richards_nr10m,wind_speed10m,particle_conc,cond_vapour,timestep,mixing_height)
   end if
   
   if (use_nucleation) then

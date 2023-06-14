@@ -297,9 +297,13 @@ END SUBROUTINE coagulation
 
   
 SUBROUTINE dry_dep_velocity(diameter,particle_density,temperature,pressure,DSWF, & 
-                            Richards_nr10m,wind_speed10m) ! Add more variables if you need it
+                            Richards_nr10m,wind_speed10m,particle_conc,vapour_conc,timestep,mixing_height) ! Add more variables if you need it
    
+  REAL(dp), DIMENSION(nr_bins) :: particle_conc
+  REAL(dp), DIMENSION(2) :: vapour_conc
   REAL(dp), DIMENSION(nr_bins), INTENT(IN) :: diameter
+  REAL(dp), INTENT(IN) :: timestep
+  REAL(dp), INTENT(IN) :: mixing_height
   
   REAL(dp), INTENT(IN) :: temperature, pressure, Richards_nr10m, DSWF, &
   wind_speed10m, particle_density
@@ -317,13 +321,48 @@ SUBROUTINE dry_dep_velocity(diameter,particle_density,temperature,pressure,DSWF,
               H_effSO2, H_effO3, H_effHNO3, H_effisoprene, H_effapinene, &
               f0_SO2, f0_O3, f0_HNO3, f0_isoprene, f0_apinene, &
               rclSO2, rclO3, rgsSO2, rgsO3
-       
+
+  ! Bulk canopy
+  REAL(dp) :: rst_h2o ! Bulk canopy stomatal resistance (for H2O)
+  REAL(dp), DIMENSION(5) :: r_sm_i ! Combination of bulk canopy stomatal and mesophyll resistances
+  ! Outer canopy and lower canopy
+  REAL(dp), DIMENSION(5) :: r_lu_i ! Outer canopy surface resistances
+  REAL(dp) :: r_dc ! Resitance in the lower canopy to transfer by bouyant convection
+  REAL(dp), DIMENSION(5) :: r_cl_i ! Resistance in the lower canopy to uptake
+  ! Soil uptake
+  ! rac is already defined and independent of the gas, transfer resistance to the soil
+  REAL(dp), DIMENSION(5) :: r_gs_i ! Resitance to uptake by the soil
+  REAL(dp), DIMENSION(5) :: r_c_i ! Combined canopy resistances for gasses
+  
+  REAL(dp), DIMENSION(5) :: deposition_gas ! Gas deposition velocity
+
+  REAL(dp), DIMENSION(nr_bins) :: v_sedimentation ! Sedimentation velocity
+  REAL(dp), DIMENSION(nr_bins) :: slip_correction ! Cunninghams slip correction factor
+  REAL(dp), DIMENSION(nr_bins) :: diffusivity ! Diffusivity of different particle sizes
+  REAL(dp), DIMENSION(nr_bins) :: z0_particle ! Surface roughness length scale for molecules and particles
+  REAL(dp), DIMENSION(nr_bins) :: ra_particle ! Aerodynamic resistance for the particles
+  REAL(dp), DIMENSION(nr_bins) :: rb_particle ! Quasi-laminar resistance for the particles-
+  REAL(dp) :: u_star ! Friction velocity
+  REAL(dp), DIMENSION(nr_bins) :: Scp ! Dimension-less Schmidt number for particles
+  REAL(dp), DIMENSION(nr_bins) :: St ! Stokes number for vegetation
+  REAL(dp), DIMENSION(nr_bins) :: R1 ! Sticking factor
+  REAL(dp), DIMENSION(nr_bins) :: deposition_particle ! Particle deposition velocity
+
+  INTEGER :: i
+
   dens_air = Mair*pressure/(Rg*temperature)    ! Air density (kg/m^3)
   dyn_visc = 1.8D-5*(temperature/298.)**0.85   ! dynamic viscosity of air (kg/(m*s))
   v_kinematic = dyn_visc/dens_air              ! kinematic viscosity of air (m^2/s)
+  
+  ! Code stolen from coagulation code in order to calculate Cunninghams slip correction factor
+  l_gas=2D0*dyn_visc/(pressure*SQRT(8D0*Mair/(pi*Rg*temperature)))                        ! Gas mean free path in air (m)
+  slip_correction = 1D0+(2D0*l_gas/(diameter))*&
+  (1.257D0+0.4D0*exp(-1.1D0/(2D0*l_gas/diameter)))                                        ! Cunninghams slip correction factor (Seinfeld and Pandis eq 9.34)
+
+  ! Particle diffusivity for later :)
+  diffusivity = slip_correction*kb*temperature/(3D0*pi*dyn_visc*diameter)                 ! Diffusivity for the different particle sizes m^2/s
 
   zr=10D0                 ! Reference height [m]
-  L_Ob=zr/Richards_nr10m  ! Monin-Obukhov length scale
   z0m = 0.9D0             ! Surface roughness length for momentum evergreen, needleleaf trees (m)     
   u_friction=ka*wind_speed10m/(log(zr/z0m))  ! Friction velocity (Eq. 16.67 from Seinfeld and Pandis, 2006)
 
@@ -339,15 +378,54 @@ SUBROUTINE dry_dep_velocity(diameter,particle_density,temperature,pressure,DSWF,
   gam = 11.6D0  ! When ka = 0.4 (Hogstrom, 1988)
 
   ! Calculate the particle sedimentation velocity:
+  DO i = 1, nr_bins
+    v_sedimentation(i) = (diameter(i) ** 2) * (particle_density - dens_air) * g * slip_correction(i) / (18.0_dp * dyn_visc)
+  END DO
 
+  ! Particle diffusivity for later :)
+  diffusivity = slip_correction*kb*temperature/(3D0*pi*dyn_visc*diameter)! Diffusivity for the different particle sizes m^2/s
   ! Calculation of aerodynamic resistance for particles for:
   ! stable boundary layer (Ri>1D-6)
   ! neutral boundary layer (abs(Ri)<1D-6
   ! unstable boundary layer Ri<-1D-6
+  ! Precalculation of z0 and u_star
+  u_star = ka * wind_speed10m / (log(zr / z0m))
+  z0_particle = diffusivity / (ka * u_star)
+  ! Check if neutral
+  IF (abs(Richards_nr10m) < 1D-6) THEN
+    do i = 1, nr_bins
+      ra_particle(i) = Pr * log(zr / z0_particle(i))
+    end do
+  ! Check if stable:
+  ELSE IF (Richards_nr10m > 0) THEN
+    do i = 1, nr_bins
+      ra_particle(i) = (Pr * log(zr / z0_particle(i)) + beta / ( (zr / Richards_nr10m) * (zr - z0_particle(i)))) / (ka * u_star)
+    end do
+  ! Else it has to be unstable:
+  ELSE
+    L_Ob=zr/Richards_nr10m ! Monin-Obukhov length scale
+    do i = 1, nr_bins
+      ra_particle(i) = Pr * log(phi(zr,L_Ob,gam) / phi(z0_particle(i),L_Ob,gam)) / (ka * u_star)
+    end do
+  END IF
 
   ! Calculate the quasi-laminar resistance (rb) for particles:
+  do i = 1, nr_bins
+    Scp(i) = v_kinematic / diffusivity(i)
+    St(i) = v_sedimentation(i) * u_star / (g * r_coll)
+    R1(i) = exp(-sqrt(St(i)))
+  end do
+
+  do i = 1, nr_bins
+    rb_particle(i) = (3 * u_star * R1(i) * (Scp(i)**(-j_landuse) + (St(i)&
+    / (a_landuse + St(i)))**2 + 0.5_dp * (diameter(i) / r_coll)**2))**(-1.0_dp)
+  end do
 
   ! Calculate the dry deposition velocity for particles:
+  do i = 1, nr_bins
+    deposition_particle(i) = 1.0_dp / (ra_particle(i) + rb_particle(i)&
+    + ra_particle(i) * rb_particle(i) * v_sedimentation(i)) + v_sedimentation(i)
+  end do
 
   ! Calculate the dry deposition velocity for O3, SO2, HNO3, isoprene and a-pinene: 
 
@@ -393,9 +471,42 @@ SUBROUTINE dry_dep_velocity(diameter,particle_density,temperature,pressure,DSWF,
   
   ! Calculate the aerodynamic resistance for O3, SO2, HNO3, isoprene & a-pinene (ra) in similar way as
   ! for particles:
+  ! Precalculation of surface roughness, u_star is the same as the previous value
+  z_roughSO2 = DiffusivitySO2 / (ka * u_star)
+  z_roughO3 = DiffusivityO3 / (ka * u_star)
+  z_roughHNO3 = DiffusivityHNO3 / (ka * u_star)
+  z_roughisoprene = Diffusivityisoprene / (ka * u_star)
+  z_roughapinene = Diffusivityapinene / (ka * u_star)
+  ! Check if neutral
+  IF (abs(Richards_nr10m) < 1D-6) THEN
+    raSO2 = Pr * log(zr / z_roughSO2)
+    raO3 = Pr * log(zr / z_roughO3)
+    raHNO3 = Pr * log(zr / z_roughHNO3)
+    raisoprene = Pr * log(zr / z_roughisoprene)
+    raapinene = Pr * log(zr / z_roughapinene)
+  ! Check if stable:
+  ELSE IF (Richards_nr10m > 0) THEN
+    raSO2 = calcZ0(zr,Richards_nr10m,Pr,ka,u_star,z_roughSO2)
+    raO3 = calcZ0(zr,Richards_nr10m,Pr,ka,u_star,z_roughO3)
+    raHNO3 = calcZ0(zr,Richards_nr10m,Pr,ka,u_star,z_roughHNO3)
+    raisoprene = calcZ0(zr,Richards_nr10m,Pr,ka,u_star,z_roughisoprene)
+    raapinene = calcZ0(zr,Richards_nr10m,Pr,ka,u_star,z_roughapinene)
+  ! Else it has to be unstable:
+  ELSE
+    L_Ob=zr/Richards_nr10m
+    raSO2 = Pr * log(phi(zr,L_Ob,gam) / phi(z_roughSO2,L_Ob,gam)) / (ka * u_star)
+    raO3 = Pr * log(phi(zr,L_Ob,gam) / phi(z_roughO3,L_Ob,gam)) / (ka * u_star)
+    raHNO3 = Pr * log(phi(zr,L_Ob,gam) / phi(z_roughHNO3,L_Ob,gam)) / (ka * u_star)
+    raisoprene = Pr * log(phi(zr,L_Ob,gam) / phi(z_roughisoprene,L_Ob,gam)) / (ka * u_star)
+    raapinene = Pr * log(phi(zr,L_Ob,gam) / phi(z_roughapinene,L_Ob,gam)) / (ka * u_star)
+  END IF
 
   ! Calculate the quasi-laminar resistance for O3, SO2, HNO3, isoprene & a-pinene (rb):
-  
+  rbSO2 = (5.0_dp / u_star) * (v_kinematic / DiffusivitySO2)**(2.0_dp/3.0_dp) 
+  rbO3 = (5.0_dp / u_star) * (v_kinematic / DiffusivityO3)**(2.0_dp/3.0_dp)
+  rbHNO3 = (5.0_dp / u_star) * (v_kinematic / DiffusivityHNO3)**(2.0_dp/3.0_dp)
+  rbisoprene = (5.0_dp / u_star) * (v_kinematic / Diffusivityisoprene)**(2.0_dp/3.0_dp)
+  rbapinene = (5.0_dp / u_star) * (v_kinematic / Diffusivityapinene)**(2.0_dp/3.0_dp) 
   ! Calculation of surface resistance for O3, SO2, HNO3, isoprene & a-pinene (rc)
   
   ! Effective Henry's lay const:
@@ -413,23 +524,80 @@ SUBROUTINE dry_dep_velocity(diameter,particle_density,temperature,pressure,DSWF,
   f0_apinene = 0D0
   
   ! Calculate the bulk canopy stomatal resistance (rst)
-  
+  rst_h2o = rj * (1 + (200.0_dp / (DSWF + 0.1_dp))**2 * 400.0_dp / (temperature * (40.0_dp - temperature)))
+
   ! Calculate the combined stomatal and mesophyll resistance (rsm):
-  
+  r_sm_i(1) = rst_h2o * D_ratio_SO2 + 1.0_dp / (3.3D-4 * H_effSO2 + 100*f0_SO2)
+  r_sm_i(2) = rst_h2o * D_ratio_O3 + 1.0_dp / (3.3D-4 * H_effO3 + 100*f0_O3)
+  r_sm_i(3) = rst_h2o * D_ratio_HNO3 + 1.0_dp / (3.3D-4 * H_effHNO3 + 100*f0_HNO3)
+  r_sm_i(4) = rst_h2o * D_ratio_isoprene + 1.0_dp / (3.3D-4 * H_effisoprene + 100*f0_isoprene)
+  r_sm_i(5) = rst_h2o * D_ratio_apinene + 1.0_dp / (3.3D-4 * H_effapinene + 100*f0_apinene)
+
   ! Calculate the resistance of the outer surfaces in the upper canopy (rlu):
-  
+  r_lu_i(1) = rlu / (1D-5 * H_effSO2 + f0_SO2)
+  r_lu_i(2) = rlu / (1D-5 * H_effO3 + f0_O3)
+  r_lu_i(3) = rlu / (1D-5 * H_effHNO3 + f0_HNO3)
+  r_lu_i(4) = rlu / (1D-5 * H_effisoprene + f0_isoprene)
+  r_lu_i(5) = rlu / (1D-5 * H_effapinene + f0_apinene)
+
   ! Calculate the resistance to transfer by buoyant convection (rdc):
-  
+  r_dc = 100.0_dp * (1.0_dp + 1000.0_dp / (DSWF + 10.0_dp))
+
   ! Calculate the resistance of the exposed surfaces in the lower portions of 
   ! structures of the canopy (rcl): 
+  r_cl_i(1) = ((1d-5 * H_effSO2 / rclSO2) + (f0_SO2 / rclO3))**(-1.0_dp)
+  r_cl_i(2) = ((1d-5 * H_effO3 / rclSO2) + (f0_O3 / rclO3))**(-1.0_dp)
+  r_cl_i(3) = ((1d-5 * H_effHNO3 / rclSO2) + (f0_HNO3 / rclO3))**(-1.0_dp)
+  r_cl_i(4) = ((1d-5 * H_effisoprene / rclSO2) + (f0_isoprene / rclO3))**(-1.0_dp)
+  r_cl_i(5) = ((1d-5 * H_effapinene / rclSO2) + (f0_apinene / rclO3))**(-1.0_dp)
           
   ! Calculate the resistance of the exposed surfaces on the groud 
   !(soil,leaf litter, ground) (rgs):
+  r_gs_i(1) = ((1d-5 * H_effSO2 / rgsSO2) + (f0_SO2 / rgsO3))**(-1.0_dp)
+  r_gs_i(2) = ((1d-5 * H_effO3 / rgsSO2) + (f0_O3 / rgsO3))**(-1.0_dp)
+  r_gs_i(3) = ((1d-5 * H_effHNO3 / rgsSO2) + (f0_HNO3 / rgsO3))**(-1.0_dp)
+  r_gs_i(4) = ((1d-5 * H_effisoprene / rgsSO2) + (f0_isoprene / rgsO3))**(-1.0_dp)
+  r_gs_i(5) = ((1d-5 * H_effapinene / rgsSO2) + (f0_apinene / rgsO3))**(-1.0_dp)
   
   ! Combine all resistances in order to get the total surface resistance 
   ! for O3, SO2, HNO3, isoprene and a-pinene (rc):
-   
+  do i = 1, 5
+    r_c_i(i) = (1.0_dp / r_sm_i(i) + 1.0_dp / r_lu_i(i) + 1.0_dp / (r_dc + r_cl_i(i)) + 1.0_dp / (rac + r_gs_i(i)))**(-1.0_dp)
+  end do
+
   ! Finally calculate the dry deposition velocity of SO2, O3, HNO3, isoprene and a-pinene:
+  deposition_gas(1) = 1.0_dp / (raSO2 + rbSO2 + r_c_i(1))
+  deposition_gas(2) = 1.0_dp / (raO3 + rbO3 + r_c_i(2))
+  deposition_gas(3) = 1.0_dp / (raHNO3 + rbHNO3 + r_c_i(3))
+  deposition_gas(4) = 1.0_dp / (raisoprene + rbisoprene + r_c_i(4))
+  deposition_gas(5) = 1.0_dp / (raapinene + rbapinene + r_c_i(5))
+
+  ! Finally do the deposition
+  do i = 1, nr_bins
+    particle_conc(i) = particle_conc(i)*exp(-deposition_particle(i) * timestep / mixing_height)
+  end do
+
 END SUBROUTINE dry_dep_velocity
+
+function phi(input,L_MO,gam) result(retval)
+  real(dp), intent(in) :: input
+  real(dp), intent(in) :: L_MO
+  real(dp), intent(in) :: gam
+  real(dp) :: retval
+  retval = (sqrt(1 - gam * input / L_MO) - 1) / (sqrt(1 - gam * input / L_MO) + 1)
+end function phi
+
+function calcZ0(zr,richards,pr,ka,u_star,z0) result(retval)
+  real(dp), intent(in) :: zr
+  real(dp), intent(in) :: richards
+  real(dp), intent(in) :: pr
+  real(dp), intent(in) :: ka
+  real(dp), intent(in) :: u_star
+  real(dp), intent(in) :: z0
+  real(dp) :: retval
+  real(dp), parameter :: beta = 7.8
+  retval = (pr * log(zr / z0) + beta / ( (zr / richards) * (zr - z0))) / (ka * u_star)
+end function
+
 
 END MODULE aerosol_mod
