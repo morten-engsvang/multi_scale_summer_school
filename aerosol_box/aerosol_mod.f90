@@ -394,7 +394,7 @@ SUBROUTINE dry_dep_velocity(diameter,particle_density,temperature,pressure,DSWF,
   ! Check if neutral
   IF (abs(Richards_nr10m) < 1D-6) THEN
     do i = 1, nr_bins
-      ra_particle(i) = Pr * log(zr / z0_particle(i))
+      ra_particle(i) = Pr * log(zr / z0_particle(i)) / (ka * u_star)
     end do
   ! Check if stable:
   ELSE IF (Richards_nr10m > 0) THEN
@@ -426,7 +426,7 @@ SUBROUTINE dry_dep_velocity(diameter,particle_density,temperature,pressure,DSWF,
     deposition_particle(i) = 1.0_dp / (ra_particle(i) + rb_particle(i)&
     + ra_particle(i) * rb_particle(i) * v_sedimentation(i)) + v_sedimentation(i)
   end do
-
+  write(*,*) ra_particle(1), rb_particle(1), v_sedimentation(1), deposition_particle(1)
   ! Calculate the dry deposition velocity for O3, SO2, HNO3, isoprene and a-pinene: 
 
   ! Resistance components used when calculating the surface resistance for gases, 

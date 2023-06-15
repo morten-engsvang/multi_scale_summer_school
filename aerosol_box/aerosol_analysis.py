@@ -4,6 +4,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors as plc
 from matplotlib.animation import FuncAnimation
+from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 import tools
 import numpy as np
 from cycler import cycler
@@ -12,7 +13,7 @@ plt.rcParams.update({'font.size': 12})
 plt.rc("axes", axisbelow = True) #Makes sure gridlines are drawn behind the markers
 
 
-def Plot(time,time_old,data1,data2,data3,xlabel,ylabel,labels,title):
+def Plot(time,time_old,data1,data2,data3,data4,xlabel,ylabel,labels,title):
     fig, axis = plt.subplots()
     colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
     custom_cycler = cycler(color=colors)
@@ -23,11 +24,12 @@ def Plot(time,time_old,data1,data2,data3,xlabel,ylabel,labels,title):
     plt.plot(time_old[:,0], data1[:,0],label=labels[0])
     plt.plot(time_old[:,0], data2[:,0],label=labels[1])
     plt.plot(time[:,0], data3[:,0],label=labels[2])
+    plt.plot(time[:,0], data4[:,0],label=labels[3])
     plt.legend()
     plt.title(title)
-    plt.grid(visible=True)
+    plt.grid(visible=True,which="both")
 
-def PlotConc(diameter,data1,data2,data3,xlabel,ylabel,labels,title):
+def PlotConc(diameter,data1,data2,data3,data4,xlabel,ylabel,labels,title):
     fig, axis = plt.subplots()
     colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
     custom_cycler = cycler(color=colors)
@@ -39,8 +41,10 @@ def PlotConc(diameter,data1,data2,data3,xlabel,ylabel,labels,title):
     plt.plot(diameter[0,:]*10**(9), data1[24,:]*10**(-6),label=labels[0])
     plt.plot(diameter[0,:]*10**(9), data2[24,:]*10**(-6),label=labels[1])
     plt.plot(diameter[0,:]*10**(9), data3[24,:]*10**(-6),label=labels[2])
-    plt.grid(visible=True)
+    plt.plot(diameter[0,:]*10**(9), data4[24,:]*10**(-6),label=labels[3])
+    plt.grid(visible=True,which="both")
     plt.title(title)
+    plt.legend()
 
 time = tools.ReadGeneralData("output/time.dat")
 time_old = tools.ReadGeneralData("old_data/Only_nucleation/time.dat")
@@ -54,11 +58,15 @@ PN_nuc_cond = tools.ReadGeneralData("old_data/nucleation_condensation/PN.dat")
 PV_nuc_cond = tools.ReadGeneralData("old_data/nucleation_condensation/PV.dat")
 conc_nuc_cond = tools.ReadGeneralData("old_data/nucleation_condensation/particle_conc.dat")
 
-PN_nuc_cond_coag = tools.ReadGeneralData("output/PN.dat")
-PV_nuc_cond_coag = tools.ReadGeneralData("output/PV.dat")
-conc_nuc_cond_coag = tools.ReadGeneralData("output/particle_conc.dat")
+PN_nuc_cond_coag = tools.ReadGeneralData("old_data/nuc_cond_coag/PN.dat")
+PV_nuc_cond_coag = tools.ReadGeneralData("old_data/nuc_cond_coag/PV.dat")
+conc_nuc_cond_coag = tools.ReadGeneralData("old_data/nuc_cond_coag/particle_conc.dat")
 
-labels = ["Only Nucleation","Nucleation + Condensation", "Nuc+Cond+Coag"]
-Plot(time,time_old,PN_nuc,PN_nuc_cond,PN_nuc_cond_coag,"Time [days]","Total PN [cm$^{-3}$]",labels,"PN")
-Plot(time,time_old,PV_nuc,PV_nuc_cond,PV_nuc_cond_coag,"Time [days]","Total PV [um$^3$$\cdot$cm$^{-3}$]",labels,"PV")
-PlotConc(diameter,conc_nuc,conc_nuc_cond,conc_nuc_cond_coag,"Diameter [nm]","$\Delta$N [cm$^{-3}$]",labels,"Particle Number Distribution After 24 hrs")
+PN_dep = tools.ReadGeneralData("output/PN.dat")
+PV_dep = tools.ReadGeneralData("output/PV.dat")
+dep = tools.ReadGeneralData("output/particle_conc.dat")
+
+labels = ["Only Nucleation","Nucleation + Condensation", "Nuc+Cond+Coag", "Nuc+Cond+Coag+Dep"]
+Plot(time,time_old,PN_nuc,PN_nuc_cond,PN_nuc_cond_coag,PN_dep,"Time [days]","Total PN [cm$^{-3}$]",labels,"PN")
+Plot(time,time_old,PV_nuc,PV_nuc_cond,PV_nuc_cond_coag,PV_dep,"Time [days]","Total PV [um$^3$$\cdot$cm$^{-3}$]",labels,"PV")
+PlotConc(diameter,conc_nuc,conc_nuc_cond,conc_nuc_cond_coag,dep,"Diameter [nm]","$\Delta$N [cm$^{-3}$]",labels,"Particle Number Distribution After 24 hrs")
