@@ -426,7 +426,7 @@ SUBROUTINE dry_dep_velocity(diameter,particle_density,temperature,pressure,DSWF,
     deposition_particle(i) = 1.0_dp / (ra_particle(i) + rb_particle(i)&
     + ra_particle(i) * rb_particle(i) * v_sedimentation(i)) + v_sedimentation(i)
   end do
-  write(*,*) ra_particle(1), rb_particle(1), v_sedimentation(1), deposition_particle(1)
+  !write(*,*) deposition_particle(1), deposition_particle(50), deposition_particle(100)
   ! Calculate the dry deposition velocity for O3, SO2, HNO3, isoprene and a-pinene: 
 
   ! Resistance components used when calculating the surface resistance for gases, 
