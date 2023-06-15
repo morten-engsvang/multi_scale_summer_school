@@ -119,6 +119,7 @@ real(dp), dimension(nz-1) :: K_m_half = 0.0_dp ! [m/s] K_m parameter for the hal
 real(dp), dimension(nz) :: K_h = 0.0_dp ! [m/s] K_h-parameter for the integer values
 real(dp), dimension(nz-1) :: K_h_half = 0.0_dp ! [m/s] K_h-parameter for the integer values
 real(dp), dimension(nz-1) :: richard = 0.0_dp ! Richardson number for thermal stability, I only define this for half-integer values of height.
+real(dp):: richards_nr10m = 0.0_dp ! Richardson number for the second lowest layer (10) where aerosols are removed.
 
 ! Final vectors to store the changes
 real(dp), dimension(nz) :: du_dt ! Derivative of u with regards to time at integer values
@@ -240,9 +241,12 @@ do while (time <= time_end)
   ! Compute deposition part every dt_depo, multiplying 1000 to convert s to ms to make mod easier
   if ( use_deposition .and. time >= time_start_deposition ) then
     if ( mod( nint((time - time_start_deposition)*1000.0d0), nint(dt_depo*1000.0d0) ) == 0 ) then
-      ! Calculate deposition velocity
+      ! First calculate Richardssons number for the second layer (10m)
+      richards_nr10m = (hh(3)-hh(2)) * grav / ((theta(3) - theta(2)) / 2.0_dp) * (theta(3) - theta(2)) / ((uwind(3) - uwind(2))**2 + (vwind(3) - vwind(2))**2) 
+      ! Calculate deposition velocity, remove the deposited concentration at
+      ! level 2 which includes canopy and soil:
+      
 
-      ! Remove deposited concentration at level 2 which includes canopy and soil
     end if
   end if
 
