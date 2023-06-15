@@ -117,7 +117,7 @@ def PlotConcentrations(time,data,xlabel,ylabel,species):
     plt.title(species)
     plt.legend()
 
-def PlotConcDistr(diameter,data1,data2,data3,xlabel,ylabel,title):
+def PlotConcDistr(diameter,data1,data2,data3,data4,xlabel,ylabel,title):
     fig, axis = plt.subplots()
     colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
     custom_cycler = cycler(color=colors)
@@ -129,6 +129,7 @@ def PlotConcDistr(diameter,data1,data2,data3,xlabel,ylabel,title):
     plt.plot(diameter[0,:]*10**(9), data1[120,:]*10**(-6), label="Only nuc")
     plt.plot(diameter[0,:]*10**(9), data2[120,:]*10**(-6), label="Nuc+Cond")
     plt.plot(diameter[0,:]*10**(9), data3[120,:]*10**(-6), label="Nuc+Cond+Coag")
+    plt.plot(diameter[0,:]*10**(9), data4[120,:]*10**(-6), label="Nuc+Cond+Coag+Dep")
     axis.set_xlim([1,10**3])
     axis.set_ylim([1,10**6])
     plt.grid(visible=True,which="both")
@@ -159,23 +160,33 @@ time = tools.ReadGeneralData("output/time.dat")
 diameter = tools.ReadGeneralData("output/diameter.dat")
 aero_conc_nuc = tools.ReadGeneralData("old_data/nuc/aerosol_conc_1.dat")
 aero_conc_nuc_cond = tools.ReadGeneralData("old_data/nuc_cond/aerosol_conc_1.dat")
-aero_conc_nuc_cond_coag = tools.ReadGeneralData("output/aerosol_conc_1.dat")
+aero_conc_nuc_cond_coag = tools.ReadGeneralData("old_data/nuc_cond_coag/aerosol_conc_1.dat")
+aero_conc_dep = tools.ReadGeneralData("output/aerosol_conc_1.dat")
+
+time_old = tools.ReadGeneralData("old_data/nuc_cond/time.dat")
+diameter_old = tools.ReadGeneralData("old_data/nuc_cond/diameter.dat")
 
 PN_nuc_cond = tools.ReadGeneralData("old_data/nuc_cond/PN.dat")
-PN = tools.ReadGeneralData("output/PN.dat")
+PN = tools.ReadGeneralData("old_data/nuc_cond_coag/PN.dat")
 
 PM_nuc_cond = tools.ReadGeneralData("old_data/nuc_cond/PM.dat")
-PM = tools.ReadGeneralData("output/PM.dat")
+PM = tools.ReadGeneralData("old_data/nuc_cond_coag/PM.dat")
 
 emission_isoprene = tools.ReadGeneralData("output/emission_isoprene.dat")
 emission_monoterpene = tools.ReadGeneralData("output/emission_monoterpene.dat")
 
 alpha_pinene = tools.ReadGeneralData("output/alpha_pinene.dat")
+alpha_pinene_old = tools.ReadGeneralData("old_data/nuc_cond_coag/alpha_pinene.dat")
 isoprene = tools.ReadGeneralData("output/isoprene.dat")
+isoprene_old = tools.ReadGeneralData("old_data/nuc_cond_coag/isoprene.dat")
 oh_radical = tools.ReadGeneralData("output/oh_radical.dat")
+oh_radical_old = tools.ReadGeneralData("old_data/nuc_cond_coag/oh_radical.dat")
 ho2_radical = tools.ReadGeneralData("output/ho2_radical.dat")
+ho2_radical_old = tools.ReadGeneralData("old_data/nuc_cond_coag/ho2_radical.dat")
 h2so4 = tools.ReadGeneralData("output/h2so4.dat")
+h2so4_old = tools.ReadGeneralData("old_data/nuc_cond_coag/h2so4.dat")
 elvoc = tools.ReadGeneralData("output/elvoc.dat")
+elvoc_old = tools.ReadGeneralData("old_data/nuc_cond_coag/elvoc.dat")
 
 Plot(hh,uwind,"Wind speed [m/s]","Height [m]",1,"U-wind")
 Plot(hh,uwind,"Wind speed [m/s]","Height [m]",5,"U-wind")
@@ -189,11 +200,17 @@ PlotHeatMap(hh,time,richard,"Time [days]","Height [m]","Ri")
 PlotHeatMapNorm(hh,time,richard,"Time [days]","Height [m]","Ri")
 labels = ["isoprene","monoterpene"]
 PlotEmissions(time, emission_isoprene, emission_monoterpene, "Time [days]", "Emission Rate [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]",labels)
+PlotConcentrations(time, alpha_pinene_old, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "alpha-pinene nuc+cond+coag")
 PlotConcentrations(time, alpha_pinene, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "alpha-pinene")
+PlotConcentrations(time, isoprene_old, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "isoprene nuc+cond+coag")
 PlotConcentrations(time, isoprene, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "isoprene")
+PlotConcentrations(time, oh_radical_old, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "OH nuc+cond+coag")
 PlotConcentrations(time, oh_radical, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "OH")
+PlotConcentrations(time, ho2_radical_old, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "HO2 nuc+cond+coag")
 PlotConcentrations(time, ho2_radical, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "HO2")
+PlotConcentrations(time, h2so4_old, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "H2SO4 nuc+cond+coag")
 PlotConcentrations(time, h2so4, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "H2SO4")
+PlotConcentrations(time, elvoc_old, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "ELVOC nuc+cond+coag")
 PlotConcentrations(time, elvoc, "time [days]", "concentration [molecules$\cdot$cm$^{-3}\cdot$s$^{-1}$]", "ELVOC")
 title = "OH (" + str(np.min(oh_radical)) + ", " + str(np.max(oh_radical)) + ")"
 PlotHeatMapNorm2(hh, time, oh_radical, "time [days]", "height [m]", 0, 2*10**(6), title)
@@ -209,7 +226,7 @@ title = "ISOPRENE (" + str(np.min(isoprene)) + ", " + str(np.max(isoprene)) + ")
 PlotHeatMapNorm2(hh, time, isoprene, "time [days]", "height [m]", 0, 1.6*10**(9), title)
 
 
-PlotConcDistr(diameter,aero_conc_nuc,aero_conc_nuc_cond,aero_conc_nuc_cond_coag,"Diameter [nm]","N [cm$^{-3}$]","Particle Size Distribution for the first layer after simulation")
-PlotTimeSeries(time, PN, PN_nuc_cond, "Time [days]", "Total PN [cm$^{-3}$]", "PN in the first model layer")
-PlotTimeSeries(time, PM, PM_nuc_cond, "Time [days]", "Total PN [$\mu$g cm$^{-3}$]", "PM in the first model layer")
-PlotHeatMap2(diameter,time,aero_conc_nuc_cond_coag,"Time [days]","PN [log$_{10}$(cm$^{-3}$)","title")
+PlotConcDistr(diameter_old,aero_conc_nuc,aero_conc_nuc_cond,aero_conc_nuc_cond_coag,aero_conc_dep,"Diameter [nm]","N [cm$^{-3}$]","Particle Size Distribution for the first layer after simulation")
+PlotTimeSeries(time_old, PN, PN_nuc_cond, "Time [days]", "Total PN [cm$^{-3}$]", "PN in the first model layer")
+PlotTimeSeries(time_old, PM, PM_nuc_cond, "Time [days]", "Total PN [$\mu$g cm$^{-3}$]", "PM in the first model layer")
+PlotHeatMap2(diameter_old,time_old,aero_conc_dep,"Time [days]","PN [log$_{10}$(cm$^{-3}$)","Concentration vs. time")

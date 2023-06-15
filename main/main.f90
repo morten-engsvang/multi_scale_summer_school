@@ -23,8 +23,7 @@ implicit none
 !-----------------------------------------------------------------------------------------
 logical :: use_emission   = .true.
 logical :: use_chemistry  = .true.
-!logical :: use_chemistry  = .false.
-logical :: use_deposition = .false.
+logical :: use_deposition = .true.
 logical :: use_aerosol    = .true.
 integer, parameter :: model_number = 3 ! Which K-model to use.
 character(len=255), parameter :: input_dir  = './input'
@@ -147,6 +146,8 @@ real(dp), dimension(nz,nr_bins) :: aerosol_conc ! Aerosol concentrations
 real(dp), dimension(nr_cond) :: cond_vapour ! [molec/m^3] Vector of concentrations of condensable vapours
 real(dp), dimension(nz) :: daero_dt ! Derivative of aerosol with regards to time 
 real(dp), dimension(nz,nr_cond) :: cond_sink ! Condensation sink for each height level for H2SO4 and ELVOC
+real(dp) :: DSWF ! [W m-2], Downward Shortwave Radiation Flux
+real(dp) :: wind_speed10m ! Total windspeed at 10 m height
 
 integer :: i, j  ! used for loops
 
@@ -242,11 +243,21 @@ do while (time <= time_end)
   if ( use_deposition .and. time >= time_start_deposition ) then
     if ( mod( nint((time - time_start_deposition)*1000.0d0), nint(dt_depo*1000.0d0) ) == 0 ) then
       ! First calculate Richardssons number for the second layer (10m)
-      richards_nr10m = (hh(3)-hh(2)) * grav / ((theta(3) - theta(2)) / 2.0_dp) * (theta(3) - theta(2)) / ((uwind(3) - uwind(2))**2 + (vwind(3) - vwind(2))**2) 
+      richards_nr10m = (hh(3)-hh(2)) * grav / ((theta(3) - theta(2)) / 2.0_dp) * (theta(3) - theta(2)) / ((uwind(3) - uwind(2))**2 + (vwind(3) - vwind(2))**2)
+      ! Calculate temp and pressure
+      temp = theta - (grav/Cp)*hh
+      pres = barometric_law(p00, temp, hh)
+      ! Calculate DSWF
+      DSWF = 6D2 * get_exp_coszen(time,daynumber,latitude)
+      ! Wind speed
+      wind_speed10m = sqrt(uwind(2)**2 + vwind(2)**2)
       ! Calculate deposition velocity, remove the deposited concentration at
       ! level 2 which includes canopy and soil:
-      
-
+      !write(*,*) "Depositing"
+      !write(*,*) aerosol_conc(2,10)
+      call dry_dep_velocity(diameter,particle_density,temp(2),pres(2),DSWF, & 
+      richards_nr10m,wind_speed10m,aerosol_conc(2,:),concentration(2,:),dt_depo,hh(2))
+      !write(*,*) aerosol_conc(2,10)
     end if
   end if
 
