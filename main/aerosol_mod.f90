@@ -81,7 +81,8 @@ SUBROUTINE aerosol_init(diameter, particle_mass, particle_volume, particle_conc,
   
   INTEGER :: i
 
-  nucleation_coef = 1D-20
+  !nucleation_coef = 1D-20
+  nucleation_coef = 1.0e-21_dp ![m3 molec-1 s-1]
   mass_accomm = 1D0
   
   !===== Particle properties =====!
